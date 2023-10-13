@@ -5,7 +5,7 @@ import { RBAC_DEFAULT_OPTIONS } from './config/default';
 import { Permission } from './Permission';
 import { Role } from './Role';
 import Storage from './storages';
-import { MemoryStorage as MemoryStorage } from './storages/MemoryStorage';
+import { MemoryStorage } from './storages/MemoryStorage';
 import {
   ActionType,
   GrandsType,

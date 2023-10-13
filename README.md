@@ -6,29 +6,59 @@ hierarchical RBAC is the authorization library.
 
 ## Motivation
 
-`ts` library for general use RBAC conception
+`ts` library for general use RBAC conception with storage
 
 ## Usage
 
 ```js
 import { RBAC } from 'rbac'; // ES5 var RBAC = require('rbac').default;
-const rbac = new RBAC({
-  roles: ['superadmin', 'admin', 'user', 'guest'],
-  permissions: {
-    user: ['create', 'delete'],
-    password: ['change', 'forgot'],
-    article: ['create'],
-    rbac: ['update'],
-  },
-  grants: {
-    guest: ['create_user', 'forgot_password'],
-    user: ['change_password'],
-    admin: ['user', 'delete_user', 'update_rbac'],
-    superadmin: ['admin'],
-  },
-});
 
+const roles = ['superadmin', 'admin', 'user', 'guest'];
+
+const permissions = {
+  user: ['create', 'delete'],
+  password: ['change', 'forgot'],
+  article: ['create'],
+  rbac: ['update']
+};
+
+const grants = {
+  guest: ['create_user', 'forgot_password'],
+  user: ['change_password'],
+  admin: ['user', 'delete_user', 'update_rbac'],
+  superadmin: ['admin']
+};
+
+// as class controller param `option`
+const rbac = new RBAC({ roles, permissions, grants });
 await rbac.init();
+
+// as fabric method `create`
+const rbac = await new RBAC().create(roles, permissions, grants)
+
+// How check on rule acces?
+const { admin } = rbac.roles;
+const action = 'create';
+const resource = 'article';
+
+// or - await rbac.can('admin', action, resource);
+// or - admin = await rbac.getRole('admin')
+if (await admin.can(action, resource)) {
+  console.log('User role admin can create article!');
+}
+
+if (await admin.canAny([['create', 'article'], ['delete', 'live']])) {
+  console.log('User role admin can create acticle!');
+}
+
+if (await admin.canAny([['create', 'article'], ['delete', 'live']])) {
+  console.log('User role admin can create acticle!');
+}
+
+if (await admin.canAll([['create', 'article'], ['delete', 'user']])) {
+  console.log('User role admin can create acticle and user delete!');
+}
+
 ``` 
 
 ## Check permissions
