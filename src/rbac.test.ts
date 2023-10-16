@@ -1,8 +1,8 @@
-import { Permission } from './Permission';
+import { Permission } from './permission';
 import { RBAC } from './RBAC';
 import Storage from './storages';
-import { MemoryStorage } from './storages/MemoryStorage';
-import { ActionType, GrandsType, RBACType, ResourceType, RoleType } from './types';
+import { MemoryStorage } from './storages/memory.storage';
+import { ActionType, GrantsType, RBACType, ResourceType, RoleType } from './types';
 
 describe(`RBAC memory storage`, () => {
   let rbac: RBAC;
@@ -17,7 +17,7 @@ describe(`RBAC memory storage`, () => {
 
   const roles: RoleType[] = ['superadmin', 'admin', 'user', 'guest'];
 
-  const grants: GrandsType = {
+  const grants: GrantsType = {
     admin: ['user', 'delete_user'],
     user: ['create_article', 'update_article'],
   };

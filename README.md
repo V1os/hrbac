@@ -11,33 +11,33 @@ hierarchical RBAC is the authorization library.
 ## Usage
 
 ```js
-import { RBAC } from 'rbac'; // ES5 var RBAC = require('rbac').default;
+import {RBAC} from 'RBAC'; // ES5 var RBAC = require('rbac').default;
 
 const roles = ['superadmin', 'admin', 'user', 'guest'];
 
 const permissions = {
-  user: ['create', 'delete'],
+  user:     ['create', 'delete'],
   password: ['change', 'forgot'],
-  article: ['create'],
-  rbac: ['update']
+  article:  ['create'],
+  rbac:     ['update']
 };
 
 const grants = {
-  guest: ['create_user', 'forgot_password'],
-  user: ['change_password'],
-  admin: ['user', 'delete_user', 'update_rbac'],
+  guest:      ['create_user', 'forgot_password'],
+  user:       ['change_password'],
+  admin:      ['user', 'delete_user', 'update_rbac'],
   superadmin: ['admin']
 };
 
 // as class controller param `option`
-const rbac = new RBAC({ roles, permissions, grants });
+const rbac = new RBAC({roles, permissions, grants});
 await rbac.init();
 
 // as fabric method `create`
 const rbac = await new RBAC().create(roles, permissions, grants)
 
 // How check on rule acces?
-const { admin } = rbac.roles;
+const {admin} = rbac.roles;
 const action = 'create';
 const resource = 'article';
 

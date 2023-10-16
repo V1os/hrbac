@@ -1,8 +1,10 @@
-import Base from '../Base';
-import { Permission } from '../Permission';
+import Base from '../base';
+import { Permission } from '../permission';
 import type { RBAC } from '../RBAC';
-import { Role } from '../Role';
-import { ActionType, ResourceType, RoleType } from '../types';
+import { Role } from '../role';
+import { ActionType, GrantType, RecordType, ResourceType, RoleType, TypeEnum } from '../types';
+
+const takeError = (nameMethod: string) => new Error(`Storage method '${nameMethod}' is not implemented`);
 
 export default class Storage {
   public rbac: RBAC | null = null;
@@ -18,52 +20,52 @@ export default class Storage {
   /** Add permission or role */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async add(item: Base): Promise<boolean> {
-    throw new Error('Storage method add is not implemented');
+    throw takeError('add');
   }
 
   /** Remove permission or role */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async remove(item: Base): Promise<boolean> {
-    throw new Error('Storage method remove is not implemented');
+    throw takeError('remove');
   }
 
   /** Add (grant) permission or role to hierarchy of actual role */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async grant(role: Base, child: Base): Promise<boolean> {
-    throw new Error('Storage method grant is not implemented');
+  async grant(role: Role, child: Base): Promise<boolean> {
+    throw takeError('grant');
   }
 
   /** Remove (revoke) permission or role from hierarchy of actual role */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async revoke(role: Base, child: Base): Promise<boolean> {
-    throw new Error('Storage method revoke is not implemented');
+  async revoke(role: Role, child: Base): Promise<boolean> {
+    throw takeError('revoke');
   }
 
   /** Get instance of permission or role by his name */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async get(name: string): Promise<Base | undefined> {
-    throw new Error('Storage method get is not implemented');
+  async get(name: RoleType | GrantType): Promise<Base | undefined> {
+    throw takeError('get');
   }
 
   /** Get all instances of Roles */
   async getRoles(): Promise<Role[]> {
-    throw new Error('Storage method getRoles is not implemented');
+    throw takeError('getRoles');
   }
 
   /** Get all instances of Permissions */
   async getPermissions(): Promise<Permission[]> {
-    throw new Error('Storage method getPermissions is not implemented');
+    throw takeError('getPermissions');
   }
 
   /** Get instances of Roles and Permissions assigned to role */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async getGrants(role: RoleType): Promise<Base[]> {
-    throw new Error('Storage method getGrants is not implemented');
+  async getGrants(roleName: RoleType): Promise<Base[]> {
+    throw takeError('getGrants');
   }
 
   /** Get instance of role by his name */
-  async getRole(name: string): Promise<Role | undefined> {
-    const role = await this.get(name);
+  async getRole(roleName: RoleType): Promise<Role | undefined> {
+    const role = await this.get(roleName);
     if (role && role instanceof Role) {
       return role;
     }
@@ -88,20 +90,55 @@ export default class Storage {
   }
 
   /** Return true with callback if role or permission exists */
-  async exists(name: string): Promise<boolean> {
+  async exists(name: RoleType | GrantType): Promise<boolean> {
     const item = await this.get(name);
+
     return !!item;
   }
 
   /** Return true with callback if role exists */
-  async existsRole(name: string): Promise<boolean> {
-    const role = await this.getRole(name);
+  async existsRole(roleName: RoleType): Promise<boolean> {
+    const role = await this.getRole(roleName);
+
     return !!role;
   }
 
   /** Return true with callback if permission exists */
   async existsPermission(action: ActionType, resource: ResourceType): Promise<boolean> {
     const permission = await this.getPermission(action, resource);
+
     return !!permission;
+  }
+
+  protected getType(item: Base) {
+    if (item instanceof Role) {
+      return TypeEnum.ROLE;
+    } else if (item instanceof Permission) {
+      return TypeEnum.PERMISSION;
+    }
+
+    return null;
+  }
+
+  protected convertToInstance(record: RecordType): Promise<Role | Permission> {
+    const rbac = this.rbac as RBAC;
+
+    if (!record) {
+      throw new Error('Record is undefined');
+    }
+
+    if (record.type === TypeEnum.ROLE) {
+      return rbac.createRole(record.name, false);
+    } else if (record.type === TypeEnum.PERMISSION) {
+      const decoded = Permission.decodeName(record.name);
+
+      if (!decoded) {
+        throw new Error('Bad permission name');
+      }
+
+      return rbac.createPermission(decoded.action, decoded.resource, false);
+    }
+
+    throw new Error('Type is undefined');
   }
 }

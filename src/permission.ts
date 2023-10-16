@@ -1,14 +1,14 @@
-import Base from './Base';
+import Base from './base';
 import { GRAND_DELIMITER } from './config/default';
 import { RBAC } from './RBAC';
-import { ActionType, DecodeNamePermissionType, DelimiterType, GrandType, ResourceType } from './types';
+import { ActionType, DecodeNamePermissionType, DelimiterType, GrantType, ResourceType } from './types';
 
 export class Permission extends Base {
   #action: DecodeNamePermissionType['action'];
   #resource: DecodeNamePermissionType['resource'];
 
   /** Compute name of permission from action and resource */
-  static createName(action: ActionType, resource: ResourceType, delimiter: DelimiterType): GrandType {
+  static createName(action: ActionType, resource: ResourceType, delimiter: DelimiterType): GrantType {
     if (!delimiter) {
       throw new Error('Delimiter is not defined');
     }

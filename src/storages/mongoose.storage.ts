@@ -1,17 +1,11 @@
 import { Model, Schema as MongooseSchema } from 'mongoose';
 import type { Connection } from 'mongoose';
 
-import Base from '../Base';
-import { Permission } from '../Permission';
-import { RBAC } from '../RBAC';
-import { Role } from '../Role';
-import { RoleType } from '../types';
+import Base from '../base';
+import { Permission } from '../permission';
+import { Role } from '../role';
+import { RoleType, TypeEnum, RecordType } from '../types';
 import Storage from './index';
-
-enum TypeEnum {
-  PERMISSION = 'PERMISSION',
-  ROLE = 'ROLE',
-}
 
 type OptionsType = {
   connection?: Connection;
@@ -19,44 +13,12 @@ type OptionsType = {
   Schema: typeof MongooseSchema<RecordType>;
 };
 
-type RecordType = { type: 'PERMISSION' | 'ROLE'; name: string; grants: string[] };
-
 function createSchema(Schema: typeof MongooseSchema<RecordType>) {
   return new Schema({
     name: { type: String, required: true, unique: true },
     type: { type: String, enum: ['PERMISSION', 'ROLE'], required: true },
     grants: [String],
   });
-}
-
-function getType(item: Base) {
-  if (item instanceof Role) {
-    return TypeEnum.ROLE;
-  } else if (item instanceof Permission) {
-    return TypeEnum.PERMISSION;
-  }
-
-  return null;
-}
-
-function convertToInstance(rbac: RBAC, record: RecordType): Promise<Role | Permission> {
-  if (!record) {
-    throw new Error('Record is undefined');
-  }
-
-  if (record.type === TypeEnum.ROLE) {
-    return rbac.createRole(record.name, false);
-  } else if (record.type === TypeEnum.PERMISSION) {
-    const decoded = Permission.decodeName(record.name);
-
-    if (!decoded) {
-      throw new Error('Bad permission name');
-    }
-
-    return rbac.createPermission(decoded.action, decoded.resource, false);
-  }
-
-  throw new Error('Type is undefined');
 }
 
 export class MongooseStorage extends Storage {
@@ -88,7 +50,7 @@ export class MongooseStorage extends Storage {
   async add(item: Base) {
     const obj = await this.model.create({
       name: item.name,
-      type: getType(item),
+      type: this.getType(item),
     });
 
     if (!obj) {
@@ -101,7 +63,7 @@ export class MongooseStorage extends Storage {
   async remove(item: Base) {
     const name = item.name;
 
-    const { acknowledged, matchedCount } = await this.model.updateOne(
+    const { acknowledged, matchedCount } = await this.model.updateMany(
       { grants: name },
       {
         $pull: {
@@ -130,7 +92,7 @@ export class MongooseStorage extends Storage {
       throw new Error('You can grant yourself');
     }
 
-    await this.model.updateOne({ name: name, type: TypeEnum.ROLE }, { $addToSet: { grants: childName } });
+    await this.model.updateOne({ name, type: TypeEnum.ROLE }, { $addToSet: { grants: childName } });
 
     return true;
   }
@@ -140,7 +102,7 @@ export class MongooseStorage extends Storage {
     const childName = child.name;
 
     const { matchedCount } = await this.model.updateOne(
-      { name: name, type: TypeEnum.ROLE },
+      { name, type: TypeEnum.ROLE },
       { $pull: { grants: childName } },
     );
 
@@ -152,36 +114,28 @@ export class MongooseStorage extends Storage {
   }
 
   async get(name: string) {
-    const rbac = this.rbac as RBAC;
-
     const record = await this.model.findOne({ name });
 
     if (record) {
-      return convertToInstance(rbac, record);
+      return this.convertToInstance(record);
     } else {
       return undefined;
     }
   }
 
   async getRoles(): Promise<Role[]> {
-    const rbac = this.rbac as RBAC;
-
     const records = await this.model.find({ type: TypeEnum.ROLE });
 
-    return records.map(r => convertToInstance(rbac, r) as unknown as Role);
+    return records.map(r => this.convertToInstance(r) as unknown as Role);
   }
 
   async getPermissions(): Promise<Permission[]> {
-    const rbac = this.rbac as RBAC;
-
     const records = await this.model.find({ type: TypeEnum.PERMISSION });
 
-    return records.map(r => convertToInstance(rbac, r) as unknown as Permission);
+    return records.map(r => this.convertToInstance(r) as unknown as Permission);
   }
 
   async getGrants(role: RoleType): Promise<Base[]> {
-    const rbac = this.rbac as RBAC;
-
     const record = await this.model.findOne({ name: role, type: TypeEnum.ROLE });
 
     if (!record || !record.grants.length) {
@@ -190,6 +144,6 @@ export class MongooseStorage extends Storage {
 
     const records = await this.model.find({ name: record.grants });
 
-    return records.map(r => convertToInstance(rbac, r) as unknown as Base);
+    return records.map(r => this.convertToInstance(r) as unknown as Base);
   }
 }

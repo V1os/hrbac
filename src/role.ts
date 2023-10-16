@@ -1,5 +1,5 @@
-import Base from './Base';
-import { Permission } from './Permission';
+import Base from './base';
+import { Permission } from './permission';
 import type { RBAC } from './RBAC';
 import { ActionType, PermissionParam, ResourceType, RoleType } from './types';
 
