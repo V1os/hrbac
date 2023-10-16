@@ -1,6 +1,6 @@
-import { Permission } from './Permission';
+import { Permission } from './permission';
 import { RBAC } from './RBAC';
-import { Role } from './Role';
+import { Role } from './role';
 import Storage from './storages';
 
 RBAC.Role = Role;

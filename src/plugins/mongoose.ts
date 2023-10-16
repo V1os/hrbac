@@ -4,10 +4,10 @@ import without from 'lodash/without';
 import { Schema } from 'mongoose';
 
 import { RBAC } from '../RBAC';
-import { ActionType, GrandType, ResourceType, RoleType } from '../types';
+import { ActionType, GrantType, ResourceType, RoleType } from '../types';
 
 type ShapeSchema = {
-  permissions: GrandType[];
+  permissions: GrantType[];
   role: RoleType;
 };
 
@@ -69,7 +69,7 @@ async function addPermission(this: MethodsContextType, rbac: RBAC, action: Actio
   return true;
 }
 
-async function removePermission(this: MethodsContextType, permissionName: GrandType) {
+async function removePermission(this: MethodsContextType, permissionName: GrantType) {
   if (indexOf(this.permissions, permissionName) === -1) {
     throw new Error('Permission was not assigned!');
   }
@@ -88,7 +88,7 @@ async function removePermission(this: MethodsContextType, permissionName: GrandT
   return true;
 }
 
-async function removePermissionFromCollection(this: MethodsContextType, permissionName: GrandType) {
+async function removePermissionFromCollection(this: MethodsContextType, permissionName: GrantType) {
   await this.update(
     {
       permissions: permissionName,

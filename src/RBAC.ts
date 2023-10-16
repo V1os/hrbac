@@ -1,14 +1,15 @@
 import isPlainObject from 'lodash/isPlainObject';
 
-import Base from './Base';
+import Base from './base';
 import { RBAC_DEFAULT_OPTIONS } from './config/default';
-import { Permission } from './Permission';
-import { Role } from './Role';
+import { Permission } from './permission';
+import { Role } from './role';
 import Storage from './storages';
-import { MemoryStorage } from './storages/MemoryStorage';
+import { MemoryStorage } from './storages/memory.storage';
 import {
   ActionType,
-  GrandsType,
+  GrantsType,
+  GrantType,
   PermissionParam,
   PermissionType,
   RBACOptionsType,
@@ -52,7 +53,7 @@ export class RBAC {
   }
 
   /** Get instance of Role or Permission by his name */
-  async get(name: string): Promise<Base | undefined> {
+  async get(name: RoleType | GrantType): Promise<Base | undefined> {
     return this.storage.get(name);
   }
 
@@ -93,7 +94,7 @@ export class RBAC {
   }
 
   /** Grant permission or role to the role */
-  async grant(role?: Base, child?: Base): Promise<boolean> {
+  async grant(role?: Role, child?: Base): Promise<boolean> {
     if (!role || !child) {
       throw new Error('One of item is undefined');
     }
@@ -110,7 +111,7 @@ export class RBAC {
   }
 
   /** Revoke permission or role from the role */
-  async revoke(role?: Base, child?: Base): Promise<boolean> {
+  async revoke(role?: Role, child?: Base): Promise<boolean> {
     if (!role || !child) {
       throw new Error('One of item is undefined');
     }
@@ -123,17 +124,17 @@ export class RBAC {
   }
 
   /** Revoke permission or role from the role by names */
-  async revokeByName(roleName: string, childName: string): Promise<boolean> {
+  async revokeByName(roleName: RoleType, childName: string): Promise<boolean> {
     const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
 
-    return this.revoke(role, child);
+    return this.revoke(role as Role, child);
   }
 
   /** Grant permission or role from the role by names */
-  async grantByName(roleName: string, childName: string): Promise<boolean> {
+  async grantByName(roleName: RoleType, childName: string): Promise<boolean> {
     const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
 
-    return this.grant(role, child);
+    return this.grant(role as Role, child);
   }
 
   /** Create a new role assigned to actual instance of RBAC */
@@ -236,7 +237,7 @@ export class RBAC {
   }
 
   /** Grant multiple items in one function */
-  async grants(roles: GrandsType) {
+  async grants(roles: GrantsType) {
     if (!isPlainObject(roles)) {
       throw new Error('Grants is not a plain object');
     }
@@ -255,7 +256,7 @@ export class RBAC {
   }
 
   /** Create multiple permissions and roles in one step */
-  async create(roleNames: RoleType[], permissionNames: PermissionType, grantsData?: GrandsType): Promise<RBACType> {
+  async create(roleNames: RoleType[], permissionNames: PermissionType, grantsData?: GrantsType): Promise<RBACType> {
     const [permissions, roles] = await Promise.all([
       this.createPermissions(permissionNames),
       this.createRoles(roleNames),

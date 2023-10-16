@@ -1,10 +1,10 @@
-import Base from '../Base';
-import { Permission } from '../Permission';
-import { Role } from '../Role';
-import { GrandType, RoleType } from '../types';
+import Base from '../base';
+import { Permission } from '../permission';
+import { Role } from '../role';
+import { GrantType, RoleType } from '../types';
 import Storage from './index';
 
-type ItemType = { instance: Base; grants: (GrandType | RoleType)[] };
+type ItemType = { instance: Base; grants: (GrantType | RoleType)[] };
 
 export class MemoryStorage extends Storage {
   items: Record<string, ItemType> = {};

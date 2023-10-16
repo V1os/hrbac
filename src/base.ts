@@ -1,8 +1,8 @@
 import type { RBAC } from './RBAC';
-import { GrandType, RoleType } from './types';
+import { GrantType, RoleType } from './types';
 
 export default class Base {
-  public name: RoleType | GrandType;
+  public name: RoleType | GrantType;
   public rbac: RBAC;
 
   constructor(rbac: RBAC, name: string) {
