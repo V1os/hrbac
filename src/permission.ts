@@ -24,7 +24,7 @@ export class Permission extends Base {
     return `${action}${delimiter}${resource}`;
   }
 
-  static decodeName(name: string, delimiter: DelimiterType = GRAND_DELIMITER): DecodeNamePermissionType {
+  static decodeName(name: GrantType, delimiter: DelimiterType = GRAND_DELIMITER): DecodeNamePermissionType {
     if (!delimiter) {
       throw new Error('delimiter is required');
     }

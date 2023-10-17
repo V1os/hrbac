@@ -1,9 +1,9 @@
-import Storage from '.';
 import Base from '../base';
 import { Permission } from '../permission';
 import { Role } from '../role';
 import { GrantType, RoleType } from '../types';
-import { logger as aclLogger } from '../util/logger';
+import aclLogger from '../util/logger';
+import Storage from './index';
 
 type ItemType = { instance: Base; grants: (GrantType | RoleType)[] };
 
@@ -58,10 +58,6 @@ export class MemoryStorage extends Storage {
     if (!this.items[childName]) {
       throw new Error(`Base ${childName} is not exist`);
     }
-
-    // if (!(role instanceof Role)) {
-    //   throw new Error('Role is not instance of Role');
-    // }
 
     if (name === childName) {
       throw new Error(`You can grant yourself ${name}`);

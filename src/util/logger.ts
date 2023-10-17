@@ -1,9 +1,9 @@
 import dayjs from 'dayjs';
 
 interface ModuleLoggerInterface {
-  error(message: string, ...optionalParams: never[]): void;
-  info(message: string, ...optionalParams: never[]): void;
   log(message: string, ...optionalParams: never[]): void;
+  info(message: string, ...optionalParams: never[]): void;
+  error(message: string, ...optionalParams: never[]): void;
 }
 
 type OptionsType = {
@@ -13,7 +13,7 @@ type OptionsType = {
 
 class SimpleLogger {
   #module: ModuleLoggerInterface;
-  #quiet: boolean;
+  readonly #quiet: boolean;
 
   constructor(options: OptionsType = { quiet: true }) {
     this.#module = options?.module ?? console;
@@ -35,4 +35,5 @@ class SimpleLogger {
   private message = (message: string) => `[${dayjs().format('YYYY-MM-DD hh:mm:ss')}][hrbac] ${message}`;
 }
 
-export const logger = new SimpleLogger();
+export { SimpleLogger };
+export default new SimpleLogger();

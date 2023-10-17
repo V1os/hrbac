@@ -33,7 +33,7 @@ export class RBAC {
       throw new Error('Delimiter is not defined');
     }
 
-    return permissions.map(permission => Permission.createName(permission[0], permission[1], delimiter));
+    return permissions.map(([action, resource]) => Permission.createName(action, resource, delimiter));
   }
 
   constructor(options?: Partial<RBACOptionsType>) {
@@ -84,7 +84,7 @@ export class RBAC {
   }
 
   /** Remove role or permission from RBAC */
-  async removeByName(name: string): Promise<boolean> {
+  async removeByName(name: RoleType | GrantType): Promise<boolean> {
     const item = await this.get(name);
     if (!item) {
       return true;
@@ -102,10 +102,6 @@ export class RBAC {
     if (role.rbac !== this || child.rbac !== this) {
       throw new Error('Item is associated to another RBAC instance');
     }
-
-    // if (!(role instanceof Role)) {
-    //   throw new Error('Role is not instance of Role');
-    // }
 
     return this.storage.grant(role, child);
   }
@@ -158,22 +154,22 @@ export class RBAC {
   }
 
   /** Callback returns true if role or permission exists */
-  async exists(name: string): Promise<boolean> {
+  async exists(name: RoleType | GrantType): Promise<boolean> {
     return this.storage.exists(name);
   }
 
   /** Callback returns true if role exists */
-  async existsRole(name: string): Promise<boolean> {
+  async existsRole(name: RoleType): Promise<boolean> {
     return this.storage.existsRole(name);
   }
 
   /** Callback returns true if permission exists */
-  async existsPermission(action: string, resource: string): Promise<boolean> {
+  async existsPermission(action: ActionType, resource: ResourceType): Promise<boolean> {
     return this.storage.existsPermission(action, resource);
   }
 
   /**  Return instance of Role by his name */
-  async getRole(name: string): Promise<Role | undefined> {
+  async getRole(name: RoleType): Promise<Role | undefined> {
     return this.storage.getRole(name);
   }
 
@@ -183,12 +179,12 @@ export class RBAC {
   }
 
   /** Return instance of Permission by his action and resource */
-  async getPermission(action: string, resource: string): Promise<Permission | undefined> {
+  async getPermission(action: ActionType, resource: ResourceType): Promise<Permission | undefined> {
     return this.storage.getPermission(action, resource);
   }
 
   /** Return instance of Permission by his name */
-  async getPermissionByName(name: string): Promise<Permission | undefined> {
+  async getPermissionByName(name: GrantType): Promise<Permission | undefined> {
     const data = Permission.decodeName(name, this.options.delimiter);
     return this.storage.getPermission(data.action, data.resource);
   }
@@ -270,6 +266,22 @@ export class RBAC {
       permissions,
       roles,
     };
+  }
+
+  async deleteAll(): Promise<RBACType> {
+    const permissions = await this.getPermissions();
+    for await (const permission of permissions) {
+      console.log('permission', permission, permission.name);
+      await permission.remove();
+    }
+
+    const roles = await this.getRoles();
+
+    for await (const role of roles) {
+      await role.remove();
+    }
+
+    return { roles: {}, permissions: {} };
   }
 
   /**
