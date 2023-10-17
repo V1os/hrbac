@@ -1,11 +1,11 @@
 import { Model, Schema as MongooseSchema } from 'mongoose';
 import type { Connection } from 'mongoose';
 
+import Storage from '.';
 import Base from '../base';
 import { Permission } from '../permission';
 import { Role } from '../role';
 import { RoleType, TypeEnum, RecordType } from '../types';
-import Storage from './index';
 
 type OptionsType = {
   connection?: Connection;

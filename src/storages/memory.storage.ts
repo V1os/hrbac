@@ -1,8 +1,9 @@
+import Storage from '.';
 import Base from '../base';
 import { Permission } from '../permission';
 import { Role } from '../role';
 import { GrantType, RoleType } from '../types';
-import Storage from './index';
+import { logger as aclLogger } from '../util/logger';
 
 type ItemType = { instance: Base; grants: (GrantType | RoleType)[] };
 
@@ -19,6 +20,8 @@ export class MemoryStorage extends Storage {
       instance: item,
       grants: [],
     };
+
+    aclLogger.log(`add ${this.getType(item)} ${item.name}`);
 
     return true;
   }
@@ -38,6 +41,9 @@ export class MemoryStorage extends Storage {
 
     // delete from items
     delete this.items[name];
+
+    aclLogger.log(`remove ${name} rule and his child`);
+
     return true;
   }
 
@@ -66,6 +72,8 @@ export class MemoryStorage extends Storage {
       grants.push(childName);
     }
 
+    aclLogger.log(`grant ${childName} to ${name}`);
+
     return true;
   }
 
@@ -83,6 +91,8 @@ export class MemoryStorage extends Storage {
     }
 
     this.items[name].grants = grants.filter(grant => grant !== childName);
+
+    aclLogger.log(`revoke ${childName} from ${name}`);
 
     return true;
   }

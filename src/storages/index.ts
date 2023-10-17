@@ -1,6 +1,6 @@
 import Base from '../base';
 import { Permission } from '../permission';
-import type { RBAC } from '../RBAC';
+import type { RBAC } from '../rbac';
 import { Role } from '../role';
 import { ActionType, GrantType, RecordType, ResourceType, RoleType, TypeEnum } from '../types';
 
@@ -32,6 +32,10 @@ export default class Storage {
   /** Add (grant) permission or role to hierarchy of actual role */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async grant(role: Role, child: Base): Promise<boolean> {
+    if (role.name === child.name) {
+      throw new Error('You can grant yourself');
+    }
+
     throw takeError('grant');
   }
 
@@ -110,7 +114,7 @@ export default class Storage {
     return !!permission;
   }
 
-  protected getType(item: Base) {
+  protected getType(item: Base): TypeEnum | null {
     if (item instanceof Role) {
       return TypeEnum.ROLE;
     } else if (item instanceof Permission) {
@@ -120,7 +124,7 @@ export default class Storage {
     return null;
   }
 
-  protected convertToInstance(record: RecordType): Promise<Role | Permission> {
+  protected convertToInstance(record?: RecordType): Promise<Role | Permission> {
     const rbac = this.rbac as RBAC;
 
     if (!record) {

@@ -21,8 +21,8 @@ import {
 
 export class RBAC {
   public options: RBACOptionsType;
-
   private storage: Storage;
+
   static Role: typeof Role;
   static Permission: typeof Permission;
   static Storage: typeof Storage;
@@ -36,13 +36,13 @@ export class RBAC {
     return permissions.map(permission => Permission.createName(permission[0], permission[1], delimiter));
   }
 
-  constructor(options: Partial<RBACOptionsType>) {
+  constructor(options?: Partial<RBACOptionsType>) {
     this.options = {
       ...RBAC_DEFAULT_OPTIONS,
       ...options,
     };
 
-    this.storage = this.options.storage || new MemoryStorage();
+    this.storage = <Storage>this.options.storage || new MemoryStorage();
     this.storage.useRBAC(this);
   }
 

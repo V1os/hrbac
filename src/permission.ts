@@ -1,6 +1,6 @@
 import Base from './base';
 import { GRAND_DELIMITER } from './config/default';
-import { RBAC } from './RBAC';
+import { RBAC } from './rbac';
 import { ActionType, DecodeNamePermissionType, DelimiterType, GrantType, ResourceType } from './types';
 
 export class Permission extends Base {

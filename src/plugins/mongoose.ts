@@ -3,7 +3,7 @@ import union from 'lodash/union';
 import without from 'lodash/without';
 import { Schema } from 'mongoose';
 
-import { RBAC } from '../RBAC';
+import { RBAC } from '../rbac';
 import { ActionType, GrantType, ResourceType, RoleType } from '../types';
 
 type ShapeSchema = {

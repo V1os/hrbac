@@ -1,4 +1,4 @@
-import type { RBAC } from './RBAC';
+import type { RBAC } from './rbac';
 import { GrantType, RoleType } from './types';
 
 export default class Base {

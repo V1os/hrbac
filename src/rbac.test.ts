@@ -1,5 +1,5 @@
 import { Permission } from './permission';
-import { RBAC } from './RBAC';
+import { RBAC } from './rbac';
 import Storage from './storages';
 import { MemoryStorage } from './storages/memory.storage';
 import { ActionType, GrantsType, RBACType, ResourceType, RoleType } from './types';

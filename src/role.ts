@@ -1,6 +1,6 @@
 import Base from './base';
 import { Permission } from './permission';
-import type { RBAC } from './RBAC';
+import type { RBAC } from './rbac';
 import { ActionType, PermissionParam, ResourceType, RoleType } from './types';
 
 export class Role extends Base {

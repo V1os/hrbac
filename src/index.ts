@@ -1,5 +1,5 @@
 import { Permission } from './permission';
-import { RBAC } from './RBAC';
+import { RBAC } from './rbac';
 import { Role } from './role';
 import Storage from './storages';
 
