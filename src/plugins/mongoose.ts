@@ -17,14 +17,6 @@ type OptionPluginType = {
 };
 type MethodsContextType = Schema<ShapeSchema>['methods'];
 
-async function getScope(this: MethodsContextType, rbac: RBAC) {
-  const permissions = this.permissions || [];
-
-  const scope = await rbac.getScope(this.role);
-
-  return union(permissions, scope);
-}
-
 /** Check if user has assigned a specific permission */
 async function can(this: MethodsContextType, rbac: RBAC, action: ActionType, resource: ResourceType) {
   // check for exist of permission
@@ -88,24 +80,6 @@ async function removePermission(this: MethodsContextType, permissionName: GrantT
   return true;
 }
 
-async function removePermissionFromCollection(this: MethodsContextType, permissionName: GrantType) {
-  await this.update(
-    {
-      permissions: permissionName,
-    },
-    {
-      $pull: {
-        permissions: permissionName,
-      },
-    },
-    {
-      multi: true,
-    },
-  );
-
-  return true;
-}
-
 /** Check if user has assigned a specific role */
 async function hasRole(this: MethodsContextType, rbac: RBAC, role: RoleType) {
   if (!this.role) {
@@ -131,22 +105,6 @@ async function removeRole(this: MethodsContextType) {
   return user.role === null;
 }
 
-async function removeRoleFromCollection(this: MethodsContextType, roleName: RoleType) {
-  await this.update(
-    {
-      role: roleName,
-    },
-    {
-      role: null,
-    },
-    {
-      multi: true,
-    },
-  );
-
-  return true;
-}
-
 async function setRole(this: MethodsContextType, rbac: RBAC, roleName: RoleType) {
   if (this.role === roleName) {
     throw new Error('User already has assigned this role');
@@ -167,6 +125,48 @@ async function setRole(this: MethodsContextType, rbac: RBAC, roleName: RoleType)
   }
 
   return user.role === this.role;
+}
+
+async function getScope(this: MethodsContextType, rbac: RBAC) {
+  const permissions = this.permissions || [];
+
+  const scope = await rbac.getScope(this.role);
+
+  return union(permissions, scope);
+}
+
+async function removeRoleFromCollection(this: MethodsContextType, roleName: RoleType) {
+  await this.update(
+    {
+      role: roleName,
+    },
+    {
+      role: null,
+    },
+    {
+      multi: true,
+    },
+  );
+
+  return true;
+}
+
+async function removePermissionFromCollection(this: MethodsContextType, permissionName: GrantType) {
+  await this.update(
+    {
+      permissions: permissionName,
+    },
+    {
+      $pull: {
+        permissions: permissionName,
+      },
+    },
+    {
+      multi: true,
+    },
+  );
+
+  return true;
 }
 
 export default function hRBACPlugin(schema: Schema<ShapeSchema>, options: OptionPluginType = {}) {

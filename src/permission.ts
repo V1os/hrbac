@@ -97,7 +97,7 @@ export class Permission extends Base {
   }
 
   /** Correct name can not contain whitespace or underscores. */
-  static isValidName(name: string, delimiter: DelimiterType): boolean {
+  static isValidName(name: string, delimiter?: DelimiterType): boolean {
     if (!delimiter) {
       throw new Error('Delimiter is not defined');
     }
