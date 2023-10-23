@@ -18,6 +18,9 @@ import {
   RoleType,
   TraverseGrantsParams,
 } from './types';
+import logger from './util/logger';
+
+logger.mute(false);
 
 export class RBAC {
   public options: RBACOptionsType;
@@ -46,19 +49,64 @@ export class RBAC {
     this.storage.useRBAC(this);
   }
 
-  async init() {
+  init() {
     const { roles, permissions, grants } = this.options;
 
     return this.create(roles, permissions, grants);
   }
 
   /** Get instance of Role or Permission by his name */
-  async get(name: RoleType | GrantType): Promise<Base | undefined> {
+  get(name: RoleType | GrantType): Promise<Base | undefined> {
     return this.storage.get(name);
   }
 
+  /**  Return instance of Role by his name */
+  getRole(name: RoleType): Promise<Role | undefined> {
+    return this.storage.getRole(name);
+  }
+
+  /** Return all instances of Role */
+  getRoles(): Promise<Role[]> {
+    return this.storage.getRoles();
+  }
+
+  /** Return instance of Permission by his action and resource */
+  getPermission(action: ActionType, resource: ResourceType): Promise<Permission | undefined> {
+    return this.storage.getPermission(action, resource);
+  }
+
+  /** Return instance of Permission by his name */
+  getPermissionByName(name: GrantType): Promise<Permission | undefined> {
+    const data = Permission.decodeName(name, this.options.delimiter);
+    return this.storage.getPermission(data.action, data.resource);
+  }
+
+  /** Return all instances of Permission */
+  getPermissions(): Promise<Permission[]> {
+    return this.storage.getPermissions();
+  }
+
+  /** Return array of all permission assigned to role of RBAC */
+  async getScope(roleName: RoleType): Promise<Base['name'][]> {
+    const scope: Base['name'][] = [];
+
+    // traverse hierarchy
+    await this.traverseGrants({
+      roleName: roleName,
+      handle: async item => {
+        if (item instanceof Permission && !scope.includes(item.name)) {
+          scope.push(item.name);
+        }
+
+        return null;
+      },
+    });
+
+    return scope;
+  }
+
   /** Register role or permission to actual RBAC instance */
-  async add(item: Base): Promise<boolean> {
+  add(item: Base): Promise<boolean> {
     if (!item) {
       throw new Error('Item is undefined');
     }
@@ -70,71 +118,25 @@ export class RBAC {
     return this.storage.add(item);
   }
 
-  /** Remove role or permission from RBAC */
-  async remove(item: Base): Promise<boolean> {
-    if (!item) {
-      throw new Error('Item is undefined');
+  /** Create multiple permissions and roles in one step */
+  async create(roleNames: RoleType[], permissionNames: PermissionType, grantsData?: GrantsType): Promise<RBACType> {
+    const [permissions, roles] = await Promise.all([
+      this.createPermissions(permissionNames),
+      this.createRoles(roleNames),
+    ]);
+
+    if (grantsData) {
+      await this.grants(grantsData);
     }
 
-    if (item.rbac !== this) {
-      throw new Error('Item is associated to another RBAC instance');
-    }
-
-    return this.storage.remove(item);
-  }
-
-  /** Remove role or permission from RBAC */
-  async removeByName(name: RoleType | GrantType): Promise<boolean> {
-    const item = await this.get(name);
-    if (!item) {
-      return true;
-    }
-
-    return item.remove();
-  }
-
-  /** Grant permission or role to the role */
-  async grant(role?: Role, child?: Base): Promise<boolean> {
-    if (!role || !child) {
-      throw new Error('One of item is undefined');
-    }
-
-    if (role.rbac !== this || child.rbac !== this) {
-      throw new Error('Item is associated to another RBAC instance');
-    }
-
-    return this.storage.grant(role, child);
-  }
-
-  /** Revoke permission or role from the role */
-  async revoke(role?: Role, child?: Base): Promise<boolean> {
-    if (!role || !child) {
-      throw new Error('One of item is undefined');
-    }
-
-    if (role.rbac !== this || child.rbac !== this) {
-      throw new Error('Item is associated to another RBAC instance');
-    }
-
-    return this.storage.revoke(role, child);
-  }
-
-  /** Revoke permission or role from the role by names */
-  async revokeByName(roleName: RoleType, childName: string): Promise<boolean> {
-    const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
-
-    return this.revoke(role as Role, child);
-  }
-
-  /** Grant permission or role from the role by names */
-  async grantByName(roleName: RoleType, childName: string): Promise<boolean> {
-    const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
-
-    return this.grant(role as Role, child);
+    return {
+      permissions,
+      roles,
+    };
   }
 
   /** Create a new role assigned to actual instance of RBAC */
-  async createRole(roleName: RoleType, add?: boolean): Promise<Role> {
+  async createRole(roleName: RoleType, add = true): Promise<Role> {
     const role = new Role(this, roleName);
     if (add) {
       await role.add();
@@ -143,55 +145,28 @@ export class RBAC {
     return role;
   }
 
+  /** Create multiple roles in one step assigned to actual instance of RBAC */
+  async createRoles(roleNames: RoleType[], add = true): Promise<Record<string, Role>> {
+    const roles: Record<string, Role> = {};
+    await Promise.all(
+      roleNames.map(async roleName => {
+        const role = await this.createRole(roleName, add);
+
+        roles[role.name] = role;
+      }),
+    );
+
+    return roles;
+  }
+
   /** Create a new permission assigned to actual instance of RBAC */
-  async createPermission(action: ActionType, resource: ResourceType, add?: boolean): Promise<Permission> {
+  async createPermission(action: ActionType, resource: ResourceType, add = true): Promise<Permission> {
     const permission = new Permission(this, action, resource);
     if (add) {
       await permission.add();
     }
 
     return permission;
-  }
-
-  /** Callback returns true if role or permission exists */
-  async exists(name: RoleType | GrantType): Promise<boolean> {
-    return this.storage.exists(name);
-  }
-
-  /** Callback returns true if role exists */
-  async existsRole(name: RoleType): Promise<boolean> {
-    return this.storage.existsRole(name);
-  }
-
-  /** Callback returns true if permission exists */
-  async existsPermission(action: ActionType, resource: ResourceType): Promise<boolean> {
-    return this.storage.existsPermission(action, resource);
-  }
-
-  /**  Return instance of Role by his name */
-  async getRole(name: RoleType): Promise<Role | undefined> {
-    return this.storage.getRole(name);
-  }
-
-  /** Return all instances of Role */
-  async getRoles(): Promise<Role[]> {
-    return this.storage.getRoles();
-  }
-
-  /** Return instance of Permission by his action and resource */
-  async getPermission(action: ActionType, resource: ResourceType): Promise<Permission | undefined> {
-    return this.storage.getPermission(action, resource);
-  }
-
-  /** Return instance of Permission by his name */
-  async getPermissionByName(name: GrantType): Promise<Permission | undefined> {
-    const data = Permission.decodeName(name, this.options.delimiter);
-    return this.storage.getPermission(data.action, data.resource);
-  }
-
-  /** Return all instances of Permission */
-  async getPermissions(): Promise<Permission[]> {
-    return this.storage.getPermissions();
   }
 
   /** Create multiple permissions in one step */
@@ -218,104 +193,106 @@ export class RBAC {
     return permissions;
   }
 
-  /** Create multiple roles in one step assigned to actual instance of RBAC */
-  async createRoles(roleNames: RoleType[], add = true): Promise<Record<string, Role>> {
-    const roles: Record<string, Role> = {};
-    await Promise.all(
-      roleNames.map(async roleName => {
-        const role = await this.createRole(roleName, add);
+  /** Grant permission or role to the role */
+  grant(role: Role, child: Base): Promise<boolean> {
+    if (role.rbac !== this || child.rbac !== this) {
+      throw new Error('Item is associated to another RBAC instance');
+    }
 
-        roles[role.name] = role;
-      }),
-    );
+    return this.storage.grant(role, child);
+  }
 
-    return roles;
+  /** Grant permission or role from the role by names */
+  async grantByName(roleName: RoleType, childName: string): Promise<boolean> {
+    const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
+
+    if (!role || !child) {
+      throw new Error('One of item is not exist');
+    }
+
+    return await this.grant(role as Role, child);
   }
 
   /** Grant multiple items in one function */
-  async grants(roles: GrantsType) {
-    if (!isPlainObject(roles)) {
+  async grants(data: GrantsType) {
+    if (!isPlainObject(data)) {
       throw new Error('Grants is not a plain object');
     }
+    const results: Record<RoleType, boolean[]> = {};
 
     await Promise.all(
-      Object.keys(roles).map(async roleName => {
-        const grants = roles[roleName];
+      Object.keys(data).map(async roleName => {
+        const grants = data[roleName];
 
-        await Promise.all(
-          grants.map(async grant => {
-            await this.grantByName(roleName, grant);
-          }),
-        );
+        results[roleName] = await Promise.all(grants.map(grant => this.grantByName(roleName, grant)));
       }),
     );
+
+    return results;
   }
 
-  /** Create multiple permissions and roles in one step */
-  async create(roleNames: RoleType[], permissionNames: PermissionType, grantsData?: GrantsType): Promise<RBACType> {
-    const [permissions, roles] = await Promise.all([
-      this.createPermissions(permissionNames),
-      this.createRoles(roleNames),
-    ]);
-
-    if (grantsData) {
-      await this.grants(grantsData);
+  /** Remove role or permission from RBAC */
+  remove(item: Base): Promise<boolean> {
+    if (!item) {
+      throw new Error('Item is undefined');
     }
 
-    return {
-      permissions,
-      roles,
-    };
+    if (item.rbac !== this) {
+      throw new Error('Item is associated to another RBAC instance');
+    }
+
+    return this.storage.remove(item);
+  }
+
+  /** Remove role or permission from RBAC */
+  async removeByName(name: RoleType | GrantType): Promise<boolean> {
+    const item = await this.get(name);
+    if (!item) {
+      return true;
+    }
+
+    return item.remove();
+  }
+
+  /** Revoke permission or role from the role */
+  revoke(role: Role, child: Base): Promise<boolean> {
+    if (!role || !child) {
+      throw new Error('One of item is undefined');
+    }
+
+    if (role.rbac !== this || child.rbac !== this) {
+      throw new Error('Item is associated to another RBAC instance');
+    }
+
+    return this.storage.revoke(role, child);
+  }
+
+  /** Revoke permission or role from the role by names */
+  async revokeByName(roleName: RoleType, childName: string): Promise<boolean> {
+    const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
+
+    if (!role || !child) {
+      throw new Error('One of item is not exist');
+    }
+
+    return this.revoke(role as Role, child);
   }
 
   async deleteAll(): Promise<RBACType> {
     const permissions = await this.getPermissions();
-    for await (const permission of permissions) {
-      console.log('permission', permission, permission.name);
+    for (const permission of permissions) {
       await permission.remove();
+      logger.log(`permission ${permission.name} deleted`);
     }
 
     const roles = await this.getRoles();
 
-    for await (const role of roles) {
+    for (const role of roles) {
       await role.remove();
+      logger.log(`role ${role.name} deleted`);
     }
 
     return { roles: {}, permissions: {} };
-  }
-
-  /**
-   * Traverse hierarchy of roles.
-   * Callback function returns as second parameter item from hierarchy or null if we are on the end of hierarchy.
-   * */
-  async traverseGrants({
-    roleName,
-    handle,
-    next = [roleName],
-    used = {},
-  }: TraverseGrantsParams): Promise<boolean | undefined> {
-    const actualRole = next.shift();
-    actualRole && (used[actualRole] = true);
-
-    const grants = actualRole ? await this.storage.getGrants(actualRole) : [];
-    for (let i = 0; i < grants.length; i += 1) {
-      const item = grants[i];
-      const { name } = item;
-
-      if (item instanceof Role && !used[name]) {
-        used[name] = true;
-        next.push(name);
-      }
-
-      const result = await handle(item);
-      if (result !== null) {
-        return result;
-      }
-    }
-
-    if (next.length) {
-      return this.traverseGrants({ roleName: void 0, handle, next, used });
-    }
   }
 
   /** Return true if role has allowed permission */
@@ -331,7 +308,7 @@ export class RBAC {
       },
     });
 
-    return can || false;
+    return can ?? false;
   }
 
   /** Check if the role has any of the given permissions. */
@@ -351,7 +328,7 @@ export class RBAC {
       },
     });
 
-    return can || false;
+    return can ?? false;
   }
 
   /** Check if the model has all the given permissions. */
@@ -381,6 +358,21 @@ export class RBAC {
     return foundedCount === permissionNames.length;
   }
 
+  /** Callback returns true if role or permission exists */
+  exists(name: RoleType | GrantType): Promise<boolean> {
+    return this.storage.exists(name);
+  }
+
+  /** Callback returns true if role exists */
+  existsRole(name: RoleType): Promise<boolean> {
+    return this.storage.existsRole(name);
+  }
+
+  /** Callback returns true if permission exists */
+  existsPermission(action: ActionType, resource: ResourceType): Promise<boolean> {
+    return this.storage.existsPermission(action, resource);
+  }
+
   /** Return true if role has allowed permission */
   async hasRole(roleName: RoleType, roleChildName: RoleType): Promise<boolean> {
     if (roleName === roleChildName) {
@@ -398,25 +390,40 @@ export class RBAC {
       },
     });
 
-    return has || false;
+    return has ?? false;
   }
 
-  /** Return array of all permission assigned to role of RBAC */
-  async getScope(roleName: RoleType): Promise<Base['name'][]> {
-    const scope: Base['name'][] = [];
+  /**
+   * Traverse hierarchy of roles.
+   * Callback function returns as second parameter item from hierarchy or null if we are on the end of hierarchy.
+   * */
+  private async traverseGrants({
+    roleName,
+    handle,
+    next = [roleName],
+    used = {},
+  }: TraverseGrantsParams): Promise<boolean | undefined> {
+    const actualRole = next.shift();
+    actualRole && (used[actualRole] = true);
 
-    // traverse hierarchy
-    await this.traverseGrants({
-      roleName: roleName,
-      handle: async item => {
-        if (item instanceof Permission && !scope.includes(item.name)) {
-          scope.push(item.name);
-        }
+    const grants = actualRole ? await this.storage.getGrants(actualRole) : [];
+    for (let i = 0; i < grants.length; i += 1) {
+      const item = grants[i];
+      const { name } = item;
 
-        return null;
-      },
-    });
+      if (item instanceof Role && !used[name]) {
+        used[name] = true;
+        next.push(name);
+      }
 
-    return scope;
+      const result = await handle(item);
+      if (result !== null) {
+        return result;
+      }
+    }
+
+    if (next.length) {
+      return this.traverseGrants({ roleName: void 0, handle, next, used });
+    }
   }
 }

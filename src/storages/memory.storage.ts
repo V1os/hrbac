@@ -7,6 +7,8 @@ import Storage from './index';
 
 type ItemType = { instance: Base; grants: (GrantType | RoleType)[] };
 
+aclLogger.mute(false);
+
 export class MemoryStorage extends Storage {
   items: Record<string, ItemType> = {};
 

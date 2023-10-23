@@ -138,7 +138,7 @@ export class MongooseStorage extends Storage {
   async getGrants(role: RoleType): Promise<Base[]> {
     const record = await this.model.findOne({ name: role, type: TypeEnum.ROLE });
 
-    if (!record || !record.grants.length) {
+    if (!record || !record.grants?.length) {
       return [];
     }
 

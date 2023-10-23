@@ -31,6 +31,11 @@ export type RBACType = {
   roles: Record<string, Role>;
 };
 
+export type RBACPlaneType = {
+  permissions: Record<string, GrantType>;
+  roles: Record<string, RoleType>;
+};
+
 type HandleTraverseGrantType = (item: Base) => Promise<boolean | null>;
 
 export interface TraverseGrantsParams {
@@ -48,7 +53,7 @@ export enum TypeEnum {
 export type RecordType = {
   type: TypeEnum;
   name: RoleType | GrantType;
-  grants: (GrantType | RoleType)[];
+  grants?: (GrantType | RoleType)[];
 };
 
 type Concat<T extends string[]> = T extends [infer F extends string, ...infer R extends string[]]
