@@ -5,7 +5,7 @@ export default class Base {
   public name: RoleType | GrantType;
   public rbac: RBAC;
 
-  constructor(rbac: RBAC, name: string) {
+  constructor(rbac: RBAC, name: RoleType | GrantType) {
     if (!rbac || !name) {
       throw new Error('One of parameters is undefined');
     }

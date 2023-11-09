@@ -49,7 +49,7 @@ export class RedisStorage extends Storage {
     this.#client.del(getRoleKey(item.name));
     this.#client.del(getPermissionKey(item.name));
 
-    aclLogger.log(`remove ${name} rule and his child`);
+    aclLogger.log(`Remove rule "${name}" and his childs`);
 
     return true;
   }
@@ -74,7 +74,7 @@ export class RedisStorage extends Storage {
       await this.setItemValue(getRoleKey(name), value);
     }
 
-    aclLogger.log(`grant rule '${childName}' to role '${name}'`);
+    aclLogger.log(`Grant permission "${childName}" to "${name}"`);
 
     return true;
   }
@@ -87,7 +87,7 @@ export class RedisStorage extends Storage {
     const item = await this.getItemByKey(getRoleKey(name));
 
     if (!item.grants?.includes(childName)) {
-      throw new Error('Rule is not associated to this role');
+      throw new Error(`Rule "${childName}" is not associated to this role`);
     }
 
     await this.setItemValue(getRoleKey(name), {
@@ -95,7 +95,7 @@ export class RedisStorage extends Storage {
       grants: item.grants?.filter(grant => grant !== childName),
     });
 
-    aclLogger.log(`revoke rule '${childName}' from role '${name}'`);
+    aclLogger.log(`Revoke rule "${childName}" from "${name}"`);
 
     return true;
   }
@@ -209,7 +209,7 @@ export class RedisStorage extends Storage {
         await this.setItemValue(getRoleKey(item.name), value);
       }
 
-      aclLogger.info(`Role ${item.name} added`);
+      aclLogger.info(`Role "${item.name}" added`);
     } else if (type === TypeEnum.PERMISSION) {
       if (await this.existsPermissionKey(item.name)) {
         const permission = await this.getItemValue(item);
@@ -222,11 +222,10 @@ export class RedisStorage extends Storage {
         } as RecordType;
 
         await this.setItemValue(getPermissionKey(item.name), value);
-        aclLogger.info(`Permission ${item.name} added`);
       }
-    } /* else {
-      throw new Error('Type is not implemented to set!');
-    }*/
+
+      aclLogger.info(`Permission "${item.name}" added`);
+    }
   }
 
   private async setItemValue(key: string, value: RecordType) {

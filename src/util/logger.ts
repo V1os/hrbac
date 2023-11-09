@@ -4,6 +4,7 @@ interface ModuleLoggerInterface {
   log(message: string, ...optionalParams: unknown[]): void;
   info(message: string, ...optionalParams: unknown[]): void;
   error(message: string, ...optionalParams: unknown[]): void;
+  debug(message: string, ...optionalParams: unknown[]): void;
 }
 
 type OptionsType = {
@@ -30,6 +31,10 @@ class SimpleLogger {
 
   error(message: string, ...optionalParams: unknown[]) {
     !this.#quiet && this.#module.error(this.message(message), ...optionalParams);
+  }
+
+  debug(message: string, ...optionalParams: unknown[]) {
+    !this.#quiet && this.#module.debug(this.message(message), ...optionalParams);
   }
 
   mute(state = true) {

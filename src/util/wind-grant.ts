@@ -1,21 +1,33 @@
-type Resource = 'client' | 'admin' | 'role' | 'permission';
-type RuleMode = 'C' | 'R' | 'U' | 'D' | 'B';
-type RuleModes =
-  | `${RuleMode}`
-  | `${RuleMode}${RuleMode}`
-  | `${RuleMode}${RuleMode}${RuleMode}`
-  | `${RuleMode}${RuleMode}${RuleMode}${RuleMode}`
-  | `${RuleMode}${RuleMode}${RuleMode}${RuleMode}${RuleMode}`;
-type Grants = Record<Resource, RuleModes>;
+import { ActionType, GrantType, ModeType, ResourceType, RoleType } from '../types';
 
-const ruleMap: Record<RuleMode, string> = { C: 'create', R: 'read', U: 'update', D: 'delete', B: 'block' };
+type RMType = ModeType;
+type RuleModesType =
+  | `${RMType}`
+  | `${RMType}${RMType}`
+  | `${RMType}${RMType}${RMType}`
+  | `${RMType}${RMType}${RMType}${RMType}`
+  | `${RMType}${RMType}${RMType}${RMType}${RMType}`
+  | `${RMType}${RMType}${RMType}${RMType}${RMType}${RMType}`;
+type GrantsType = Record<ResourceType, RuleModesType>;
 
-export const windGrant = (options: Partial<Grants>, delimiter = '_') => {
-  const grants: string[] = [];
+const modeMap: Record<RMType, ActionType> = {
+  C: 'create',
+  R: 'read',
+  U: 'update',
+  D: 'delete',
+  B: 'block',
+  N: 'cancel',
+};
 
-  for (const [resource, rules = 'R'] of Object.entries(options)) {
-    for (const rule of rules as unknown as RuleMode[]) {
-      grants.push(`${ruleMap[rule]}${delimiter}${resource}`);
+export const windGrant = (options: Partial<GrantsType>, delimiter = '_') => {
+  const grants: (GrantType | RoleType)[] = [];
+
+  for (const [resource, ruleModes = 'R'] of Object.entries(options)) {
+    for (const mode of ruleModes as unknown as RMType[]) {
+      if (!modeMap[mode]) {
+        throw new Error('Cant find action resource');
+      }
+      grants.push(`${modeMap[mode]}${delimiter}${resource as ResourceType}`);
     }
   }
 

@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+
 import { Permission } from './permission';
 import { RBAC } from './rbac';
 import Storage from './storages';
 import { MemoryStorage } from './storages/memory.storage';
-import { ActionType, GrantsType, RBACType, ResourceType, RoleType } from './types';
+import { ActionType, GrantsType, PermissionType, RBACType, ResourceType, RoleType } from './types';
 
 describe(`RBAC memory storage`, () => {
   let rbac: RBAC;
@@ -22,7 +24,7 @@ describe(`RBAC memory storage`, () => {
     user: ['create_article', 'update_article'],
   };
 
-  const permissionsAsObject = {
+  const permissionsAsObject: PermissionType = {
     article: ['create', 'update'],
     user: ['delete'],
   };
@@ -140,6 +142,7 @@ describe(`RBAC memory storage`, () => {
   });
 
   test('should not be able to get permission through getRole', async () => {
+    // @ts-ignore
     const permission = await rbac.getRole('create_article');
     expect(permission).toBeUndefined();
   });
@@ -150,6 +153,7 @@ describe(`RBAC memory storage`, () => {
   });
 
   test('should not be able to get role through getPermission', async () => {
+    // @ts-ignore
     await expect(rbac.getPermission('admin', '')).rejects.toEqual(new Error('Resource is not defined'));
   });
 
@@ -223,6 +227,7 @@ describe(`RBAC memory storage`, () => {
   });
 
   test('should able to check existance of non exist role', async () => {
+    // @ts-ignore
     const exists = await rbac.exists('adminooooo');
     expect(exists).toBe(false);
   });
@@ -240,6 +245,7 @@ describe(`RBAC memory storage`, () => {
   test('should be able to create roles and permissions with constructor', async () => {
     const localrbac = new RBAC({
       roles,
+      // @ts-ignore
       permissions: permissionsAsObject,
       grants,
     });
@@ -266,13 +272,17 @@ describe(`RBAC memory storage`, () => {
       roles: ['superadmin', 'admin', 'user', 'guest'],
       permissions: {
         user: ['create', 'delete'],
+        // @ts-ignore
         password: ['change', 'forgot'],
         article: ['create'],
         rbac: ['update'],
       },
       grants: {
+        // @ts-ignore
         guest: ['create_user', 'forgot_password'],
+        // @ts-ignore
         user: ['change_password'],
+        // @ts-ignore
         admin: ['user', 'delete_user', 'update_rbac', 'create_article'],
         superadmin: ['admin'],
       },

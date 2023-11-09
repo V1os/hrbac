@@ -1,8 +1,8 @@
-const {join} = require('path');
 const esbuild = require('esbuild');
 const {nodeExternalsPlugin} = require('esbuild-node-externals');
 const TsconfigPathsPlugin = require('@esbuild-plugins/tsconfig-paths').default;
 const {dtsPlugin} = require('esbuild-plugin-d.ts');
+const {join} = require('path');
 const isWatching = process.argv.includes('--watch');
 
 esbuild
@@ -15,7 +15,7 @@ esbuild
     format:    'esm',
     platform:  'node',
     target:    ['esnext'],
-    outdir:   './build',
+    outdir:    './dist',
     plugins:   [
       nodeExternalsPlugin(),
       TsconfigPathsPlugin({

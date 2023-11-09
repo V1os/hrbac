@@ -132,9 +132,9 @@ export default class Storage {
     }
 
     if (record.type === TypeEnum.ROLE) {
-      return rbac.createRole(record.name, false);
+      return rbac.createRole(record.name as RoleType, false);
     } else if (record.type === TypeEnum.PERMISSION) {
-      const decoded = Permission.decodeName(record.name);
+      const decoded = Permission.decodeName(record.name as GrantType);
 
       if (!decoded) {
         throw new Error('Bad permission name');

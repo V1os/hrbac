@@ -13,7 +13,7 @@ hierarchical RBAC is the authorization library.
 ```js
 import {RBAC} from 'RBAC'; // ES5 var RBAC = require('rbac').default;
 
-const roles = ['superadmin', 'admin', 'user', 'guest'];
+const roles = ['admin', 'user', 'guest'];
 
 const permissions = {
   user:     ['create', 'delete'],

@@ -1,7 +1,7 @@
 import isPlainObject from 'lodash/isPlainObject';
 
 import Base from './base';
-import { RBAC_DEFAULT_OPTIONS } from './config/default';
+import { GRAND_DELIMITER, RBAC_DEFAULT_OPTIONS } from './config/default';
 import { Permission } from './permission';
 import { Role } from './role';
 import Storage from './storages';
@@ -22,16 +22,20 @@ import logger from './util/logger';
 
 logger.mute(false);
 
+const forbiddenError = new Error('Forbidden');
+
 export class RBAC {
   public options: RBACOptionsType;
   private storage: Storage;
+
+  #upRule = false;
 
   static Role: typeof Role;
   static Permission: typeof Permission;
   static Storage: typeof Storage;
 
   /** Convert Array of permissions to permission name */
-  static getPermissionNames(permissions: PermissionParam[], delimiter: string): string[] {
+  static getPermissionNames(permissions: PermissionParam[], delimiter: string = GRAND_DELIMITER): string[] {
     if (!delimiter) {
       throw new Error('Delimiter is not defined');
     }
@@ -49,10 +53,21 @@ export class RBAC {
     this.storage.useRBAC(this);
   }
 
-  init() {
-    const { roles, permissions, grants } = this.options;
+  protected set upRule(value: boolean) {
+    this.#upRule = value;
+  }
 
-    return this.create(roles, permissions, grants);
+  get upRule() {
+    return this.#upRule;
+  }
+
+  async init() {
+    const { roles, permissions, grants } = this.options;
+    this.upRule = true;
+    const result = await this.create(roles, permissions, grants);
+    this.upRule = false;
+
+    return result;
   }
 
   /** Get instance of Role or Permission by his name */
@@ -113,6 +128,10 @@ export class RBAC {
 
     if (item.rbac !== this) {
       throw new Error('Item is associated to another RBAC instance');
+    }
+
+    if (item.name === Role.sudoName && !this.upRule) {
+      throw forbiddenError;
     }
 
     return this.storage.add(item);
@@ -177,18 +196,12 @@ export class RBAC {
 
     const permissions: Record<string, Permission> = {};
 
-    await Promise.all(
-      Object.keys(resources).map(async resource => {
-        const actions = resources[resource];
-
-        await Promise.all(
-          actions.map(async action => {
-            const permission = await this.createPermission(action, resource, add);
-            permissions[permission.name] = permission;
-          }),
-        );
-      }),
-    );
+    for (const [resource, actions] of Object.entries(resources)) {
+      for (const action of actions) {
+        const permission = await this.createPermission(action, resource as ResourceType, add);
+        permissions[permission.name] = permission;
+      }
+    }
 
     return permissions;
   }
@@ -199,34 +212,37 @@ export class RBAC {
       throw new Error('Item is associated to another RBAC instance');
     }
 
+    if (child.name === Role.sudoName && !this.upRule) {
+      throw forbiddenError;
+    }
+
     return this.storage.grant(role, child);
   }
 
   /** Grant permission or role from the role by names */
-  async grantByName(roleName: RoleType, childName: string): Promise<boolean> {
+  async grantByName(roleName: RoleType, childName: RoleType | GrantType): Promise<boolean> {
     const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
 
-    if (!role || !child) {
-      throw new Error('One of item is not exist');
-    }
+    this.checkItems(role?.name, child?.name);
 
-    return await this.grant(role as Role, child);
+    return await this.grant(role as Role, child as Base);
   }
 
   /** Grant multiple items in one function */
-  async grants(data: GrantsType) {
+  async grants(data: GrantsType): Promise<Partial<Record<RoleType, boolean[]>>> {
     if (!isPlainObject(data)) {
       throw new Error('Grants is not a plain object');
     }
-    const results: Record<RoleType, boolean[]> = {};
+    const results: Partial<Record<RoleType, boolean[]>> = {};
 
-    await Promise.all(
-      Object.keys(data).map(async roleName => {
-        const grants = data[roleName];
+    for (const [roleName, grants] of Object.entries(data)) {
+      const write = [];
+      for (const grant of grants) {
+        write.push(await this.grantByName(roleName as RoleType, grant));
+      }
 
-        results[roleName] = await Promise.all(grants.map(grant => this.grantByName(roleName, grant)));
-      }),
-    );
+      results[roleName as RoleType] = write;
+    }
 
     return results;
   }
@@ -239,6 +255,10 @@ export class RBAC {
 
     if (item.rbac !== this) {
       throw new Error('Item is associated to another RBAC instance');
+    }
+
+    if (item.name === Role.sudoName && !this.upRule) {
+      throw forbiddenError;
     }
 
     return this.storage.remove(item);
@@ -256,26 +276,26 @@ export class RBAC {
 
   /** Revoke permission or role from the role */
   revoke(role: Role, child: Base): Promise<boolean> {
-    if (!role || !child) {
-      throw new Error('One of item is undefined');
-    }
+    this.checkItems(role?.name, child?.name);
 
     if (role.rbac !== this || child.rbac !== this) {
       throw new Error('Item is associated to another RBAC instance');
+    }
+
+    if (role.name === Role.sudoName && !this.upRule) {
+      throw forbiddenError;
     }
 
     return this.storage.revoke(role, child);
   }
 
   /** Revoke permission or role from the role by names */
-  async revokeByName(roleName: RoleType, childName: string): Promise<boolean> {
+  async revokeByName(roleName: RoleType, childName: RoleType | GrantType): Promise<boolean> {
     const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
 
-    if (!role || !child) {
-      throw new Error('One of item is not exist');
-    }
+    this.checkItems(role?.name, child?.name);
 
-    return this.revoke(role as Role, child);
+    return this.revoke(role as Role, child as Base);
   }
 
   async deleteAll(): Promise<RBACType> {
@@ -314,7 +334,7 @@ export class RBAC {
   /** Check if the role has any of the given permissions. */
   async canAny(roleName: RoleType, permissions: PermissionParam[]): Promise<boolean> {
     // prepare the names of permissions
-    const permissionNames = RBAC.getPermissionNames(permissions, this.options.delimiter);
+    const permissionNames = RBAC.getPermissionNames(permissions, this.options?.delimiter);
 
     // traverse hierarchy
     const can = await this.traverseGrants({
@@ -332,18 +352,18 @@ export class RBAC {
   }
 
   /** Check if the model has all the given permissions. */
-  async canAll(roleName: RoleType, permissions: PermissionParam[]) {
+  async canAll(roleName: RoleType, permissions: PermissionParam[]): Promise<boolean> {
     // prepare the names of permissions
     const permissionNames = RBAC.getPermissionNames(permissions, this.options.delimiter);
-    const founded: Record<RoleType, boolean> = {};
+    const founded: Partial<Record<RoleType, boolean>> = {};
     let foundedCount = 0;
 
     // traverse hierarchy
     await this.traverseGrants({
       roleName: roleName,
       handle: async item => {
-        if (item instanceof Permission && permissionNames.includes(item.name) && !founded[item.name]) {
-          founded[item.name] = true;
+        if (item instanceof Permission && permissionNames.includes(item.name) && !founded[item.name as RoleType]) {
+          founded[item.name as RoleType] = true;
           foundedCount += 1;
 
           if (foundedCount === permissionNames.length) {
@@ -411,9 +431,9 @@ export class RBAC {
       const item = grants[i];
       const { name } = item;
 
-      if (item instanceof Role && !used[name]) {
-        used[name] = true;
-        next.push(name);
+      if (item instanceof Role && !used[name as RoleType]) {
+        used[name as RoleType] = true;
+        next.push(name as RoleType);
       }
 
       const result = await handle(item);
@@ -424,6 +444,16 @@ export class RBAC {
 
     if (next.length) {
       return this.traverseGrants({ roleName: void 0, handle, next, used });
+    }
+  }
+
+  private checkItems(role?: string, child?: string) {
+    if (!role) {
+      throw new Error(`Base role '${role}' is not exist`);
+    }
+
+    if (!child) {
+      throw new Error(`Permission '${child}' is missing for grant or revoke`);
     }
   }
 }

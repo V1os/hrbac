@@ -4,6 +4,8 @@ import type { RBAC } from './rbac';
 import { ActionType, PermissionParam, ResourceType, RoleType } from './types';
 
 export class Role extends Base {
+  static readonly sudoName = 'superadmin';
+
   constructor(
     public rbac: RBAC,
     name: RoleType,
@@ -27,26 +29,26 @@ export class Role extends Base {
 
   /** Return true if contains permission */
   async can(action: ActionType, resource: ResourceType): Promise<boolean> {
-    return this.rbac.can(this.name, action, resource);
+    return this.rbac.can(this.name as RoleType, action, resource);
   }
 
   /** Check if the role has any of the given permissions */
   async canAny(permissions: PermissionParam[]): Promise<boolean> {
-    return this.rbac.canAny(this.name, permissions);
+    return this.rbac.canAny(this.name as RoleType, permissions);
   }
 
   /** Check if the model has all the given permissions */
   async canAll(permissions: PermissionParam[]): Promise<boolean> {
-    return this.rbac.canAll(this.name, permissions);
+    return this.rbac.canAll(this.name as RoleType, permissions);
   }
 
   /** Return true if the current role contains the specified role name */
   async hasRole(roleChildName: RoleType): Promise<boolean> {
-    return this.rbac.hasRole(this.name, roleChildName);
+    return this.rbac.hasRole(this.name as RoleType, roleChildName);
   }
 
   /** Return array of permission assigned to actual role */
   async getScope(): Promise<Base['name'][]> {
-    return this.rbac.getScope(this.name);
+    return this.rbac.getScope(this.name as RoleType);
   }
 }

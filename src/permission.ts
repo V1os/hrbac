@@ -8,7 +8,7 @@ export class Permission extends Base {
   #resource: DecodeNamePermissionType['resource'];
 
   /** Compute name of permission from action and resource */
-  static createName(action: ActionType, resource: ResourceType, delimiter: DelimiterType): GrantType {
+  static createName(action: ActionType, resource: ResourceType, delimiter: DelimiterType = GRAND_DELIMITER): GrantType {
     if (!delimiter) {
       throw new Error('Delimiter is not defined');
     }
@@ -39,8 +39,8 @@ export class Permission extends Base {
     }
 
     return {
-      action: name.slice(0, pos),
-      resource: name.slice(pos + 1),
+      action: name.slice(0, pos) as ActionType,
+      resource: name.slice(pos + 1) as ResourceType,
     };
   }
 
@@ -66,7 +66,7 @@ export class Permission extends Base {
   /** Get action name of actual permission */
   get action(): ActionType {
     if (!this.#action) {
-      const decoded = Permission.decodeName(this.name, this.rbac.options.delimiter);
+      const decoded = Permission.decodeName(this.name as GrantType, this.rbac.options.delimiter);
       if (!decoded) {
         throw new Error('Action is null');
       }
@@ -80,7 +80,7 @@ export class Permission extends Base {
   /** Get resource name of actual permission */
   get resource(): ResourceType {
     if (!this.#resource) {
-      const decoded = Permission.decodeName(this.name, this.rbac.options.delimiter);
+      const decoded = Permission.decodeName(this.name as GrantType, this.rbac.options.delimiter);
       if (!decoded) {
         throw new Error('Resource is null');
       }
@@ -97,7 +97,7 @@ export class Permission extends Base {
   }
 
   /** Correct name can not contain whitespace or underscores. */
-  static isValidName(name: string, delimiter?: DelimiterType): boolean {
+  static isValidName(name: string, delimiter: DelimiterType = GRAND_DELIMITER): boolean {
     if (!delimiter) {
       throw new Error('Delimiter is not defined');
     }
