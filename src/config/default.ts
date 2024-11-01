@@ -1,27 +1,29 @@
-import { RBACOptionsType } from '../types';
-import { windGrant } from '../util/wind-grant';
+import { RBACOptionsType } from 'hrbac';
+
+import { ActionType, ResourceNameType, RoleType } from '../types';
+import { windGrant } from '../utils/wind-grant';
+
+const rules = (params: Parameters<typeof windGrant<RoleType, ActionType, ResourceNameType>>[0]) => windGrant(params);
 
 export const GRAND_DELIMITER = '_';
 
-export const RBAC_DEFAULT_OPTIONS: RBACOptionsType = {
+export const RBAC_DEFAULT_OPTIONS = {
   permissions: {},
   roles: [],
   grants: {},
   delimiter: GRAND_DELIMITER,
 };
 
-export const initializeRBAC: RBACOptionsType = {
-  roles: ['superadmin', 'admin', 'manager', 'user', 'guest'],
+export const initializeRBAC: RBACOptionsType<RoleType, ActionType, ResourceNameType> = {
+  roles: ['superadmin', 'admin', 'user'],
   permissions: {
-    user: ['read', 'create', 'update', 'block'],
-    guest: ['read', 'create'],
-    role: ['read', 'create', 'update', 'delete'],
-    permission: ['read', 'create', 'update', 'delete'],
+    user: ['read', 'create', 'update'],
+    page: ['read', 'delete'],
+    text: ['read', 'create', 'update'],
   },
   grants: {
-    user: windGrant({ user: 'R', guest: 'R' }),
-    manager: windGrant({ user: 'CU' }).concat('user'),
-    admin: windGrant({ user: 'B', guest: 'C' }).concat('manager'),
-    superadmin: windGrant({ role: 'CRUD', permission: 'CRUD' }).concat('admin'),
+    user: rules({ user: ['read'], page: ['read'] }),
+    admin: rules({ user: ['create', 'update'], page: ['create', 'update'] }).concat('user'),
+    superadmin: rules({ user: ['delete'], page: ['delete'], text: ['delete'] }).concat('admin'),
   },
 };

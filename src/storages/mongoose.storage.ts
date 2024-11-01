@@ -1,31 +1,36 @@
+import { RecordType } from 'hrbac';
 import { Model, Schema as MongooseSchema } from 'mongoose';
 import type { Connection } from 'mongoose';
 
 import Storage from '.';
 import Base from '../base';
+import { TypeEnum } from '../enums';
 import { Permission } from '../permission';
 import { Role } from '../role';
-import { RoleType, TypeEnum, RecordType } from '../types';
 
-type OptionsType = {
+type OptionsType<R extends string, A extends string, RS extends string> = {
   connection?: Connection;
   modelName?: string;
-  Schema: typeof MongooseSchema<RecordType>;
+  Schema: typeof MongooseSchema<RecordType<R, A, RS>>;
 };
 
-function createSchema(Schema: typeof MongooseSchema<RecordType>) {
+function createSchema<R extends string, A extends string, RS extends string>(
+  Schema: typeof MongooseSchema<RecordType<R, A, RS>>,
+) {
   return new Schema({
+    type: { type: String, enum: TypeEnum, required: true },
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     name: { type: String, required: true, unique: true },
-    type: { type: String, enum: ['PERMISSION', 'ROLE'], required: true },
     grants: [String],
   });
 }
 
-export class MongooseStorage extends Storage {
-  readonly #options: OptionsType;
-  readonly #model: Model<RecordType>;
+export class MongooseStorage<R extends string, A extends string, RS extends string> extends Storage<R, A, RS> {
+  readonly #options: OptionsType<R, A, RS>;
+  readonly #model: Model<RecordType<R, A, RS>>;
 
-  constructor(options: OptionsType) {
+  constructor(options: OptionsType<R, A, RS>) {
     super();
     const { modelName = 'rbac', Schema = MongooseSchema, connection } = options;
 
@@ -36,7 +41,7 @@ export class MongooseStorage extends Storage {
 
     this.#options = options;
 
-    this.#model = connection.model(modelName, createSchema(Schema));
+    this.#model = connection.model(modelName, createSchema<R, A, RS>(Schema));
   }
 
   get model() {
@@ -47,7 +52,7 @@ export class MongooseStorage extends Storage {
     return this.#options;
   }
 
-  async add(item: Base) {
+  async add(item: Base<R, A, RS>) {
     const obj = await this.model.create({
       name: item.name,
       type: this.getType(item),
@@ -60,7 +65,7 @@ export class MongooseStorage extends Storage {
     return true;
   }
 
-  async remove(item: Base) {
+  async remove(item: Base<R, A, RS>) {
     const name = item.name;
 
     const { acknowledged, matchedCount } = await this.model.updateMany(
@@ -80,7 +85,7 @@ export class MongooseStorage extends Storage {
     return true;
   }
 
-  async grant(role: Base, child: Base) {
+  async grant(role: Base<R, A, RS>, child: Base<R, A, RS>) {
     const name = role.name;
     const childName = child.name;
 
@@ -97,7 +102,7 @@ export class MongooseStorage extends Storage {
     return true;
   }
 
-  async revoke(role: Base, child: Base) {
+  async revoke(role: Base<R, A, RS>, child: Base<R, A, RS>) {
     const name = role.name;
     const childName = child.name;
 
@@ -113,7 +118,7 @@ export class MongooseStorage extends Storage {
     return true;
   }
 
-  async get(name: string) {
+  async get(name: string): Promise<Base<R, A, RS> | undefined> {
     const record = await this.model.findOne({ name });
 
     if (record) {
@@ -123,19 +128,19 @@ export class MongooseStorage extends Storage {
     }
   }
 
-  async getRoles(): Promise<Role[]> {
+  async getRoles(): Promise<Role<R, A, RS>[]> {
     const records = await this.model.find({ type: TypeEnum.ROLE });
 
-    return records.map(r => this.convertToInstance(r) as unknown as Role);
+    return records.map(r => this.convertToInstance(r) as unknown as Role<R, A, RS>);
   }
 
-  async getPermissions(): Promise<Permission[]> {
+  async getPermissions(): Promise<Permission<R, A, RS>[]> {
     const records = await this.model.find({ type: TypeEnum.PERMISSION });
 
-    return records.map(r => this.convertToInstance(r) as unknown as Permission);
+    return records.map(r => this.convertToInstance(r) as unknown as Permission<R, A, RS>);
   }
 
-  async getGrants(role: RoleType): Promise<Base[]> {
+  async getGrants(role: R): Promise<Base<R, A, RS>[]> {
     const record = await this.model.findOne({ name: role, type: TypeEnum.ROLE });
 
     if (!record || !record.grants?.length) {
@@ -144,6 +149,6 @@ export class MongooseStorage extends Storage {
 
     const records = await this.model.find({ name: record.grants });
 
-    return records.map(r => this.convertToInstance(r) as unknown as Base);
+    return records.map(r => this.convertToInstance(r) as unknown as Base<R, A, RS>);
   }
 }

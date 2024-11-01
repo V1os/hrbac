@@ -26,15 +26,15 @@ class SimpleLogger {
   }
 
   info(message: string, ...optionalParams: unknown[]) {
-    !this.#quiet && this.#module.info(this.message(message), ...optionalParams);
+    !this.#quiet && this.#module.info(this.message(`Info: ${message}`), ...optionalParams);
   }
 
   error(message: string, ...optionalParams: unknown[]) {
-    !this.#quiet && this.#module.error(this.message(message), ...optionalParams);
+    !this.#quiet && this.#module.error(this.message(`Error: ${message}`), ...optionalParams);
   }
 
   debug(message: string, ...optionalParams: unknown[]) {
-    !this.#quiet && this.#module.debug(this.message(message), ...optionalParams);
+    !this.#quiet && this.#module.debug(this.message(`Debug: ${message}`), ...optionalParams);
   }
 
   mute(state = true) {

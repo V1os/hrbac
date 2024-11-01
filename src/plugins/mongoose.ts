@@ -1,24 +1,31 @@
+import { GrantType } from 'hrbac';
 import indexOf from 'lodash/indexOf';
 import union from 'lodash/union';
 import without from 'lodash/without';
 import { Schema } from 'mongoose';
 
 import { RBAC } from '../rbac';
-import { ActionType, GrantType, ResourceType, RoleType } from '../types';
 
-type ShapeSchema = {
-  permissions: GrantType[];
-  role: RoleType;
+type ShapeSchema<A extends string, R extends string, RS extends string> = {
+  permissions?: GrantType<A, RS>[];
+  role?: R;
 };
 
-type OptionPluginType = {
-  defaultPermissions?: ShapeSchema['permissions'];
-  defaultRole?: ShapeSchema['role'];
+type OptionPluginType<A extends string, R extends string, RS extends string> = {
+  defaultPermissions?: ShapeSchema<A, R, RS>['permissions'];
+  defaultRole?: ShapeSchema<A, R, RS>['role'];
 };
-type MethodsContextType = Schema<ShapeSchema>['methods'];
+type MethodsContextType<A extends string, R extends string, RS extends string> = Schema<
+  ShapeSchema<A, R, RS>
+>['methods'];
 
 /** Check if user has assigned a specific permission */
-async function can(this: MethodsContextType, rbac: RBAC, action: ActionType, resource: ResourceType) {
+async function can<A extends string, R extends string, RS extends string>(
+  this: MethodsContextType<A, R, RS>,
+  rbac: RBAC<R, A, RS>,
+  action: A,
+  resource: RS,
+) {
   // check for exist of permission
   const permission = await rbac.getPermission(action, resource);
 
@@ -40,7 +47,12 @@ async function can(this: MethodsContextType, rbac: RBAC, action: ActionType, res
 }
 
 /** Assign additional permissions to the user */
-async function addPermission(this: MethodsContextType, rbac: RBAC, action: ActionType, resource: ResourceType) {
+async function addPermission<A extends string, R extends string, RS extends string>(
+  this: MethodsContextType<A, R, RS>,
+  rbac: RBAC<R, A, RS>,
+  action: A,
+  resource: RS,
+) {
   const permission = await rbac.getPermission(action, resource);
   if (!permission) {
     throw new Error('Permission not exists');
@@ -61,7 +73,10 @@ async function addPermission(this: MethodsContextType, rbac: RBAC, action: Actio
   return true;
 }
 
-async function removePermission(this: MethodsContextType, permissionName: GrantType) {
+async function removePermission<A extends string, R extends string, RS extends string>(
+  this: MethodsContextType<A, R, RS>,
+  permissionName: GrantType<A, RS>,
+) {
   if (indexOf(this.permissions, permissionName) === -1) {
     throw new Error('Permission was not assigned!');
   }
@@ -81,7 +96,11 @@ async function removePermission(this: MethodsContextType, permissionName: GrantT
 }
 
 /** Check if user has assigned a specific role */
-async function hasRole(this: MethodsContextType, rbac: RBAC, role: RoleType) {
+async function hasRole<A extends string, R extends string, RS extends string>(
+  this: MethodsContextType<A, R, RS>,
+  rbac: RBAC<R, A, RS>,
+  role: R,
+) {
   if (!this.role) {
     return false;
   }
@@ -90,7 +109,7 @@ async function hasRole(this: MethodsContextType, rbac: RBAC, role: RoleType) {
   return rbac.hasRole(this.role, role);
 }
 
-async function removeRole(this: MethodsContextType) {
+async function removeRole<A extends string, R extends string, RS extends string>(this: MethodsContextType<A, R, RS>) {
   if (!this.role) {
     return false;
   }
@@ -105,7 +124,11 @@ async function removeRole(this: MethodsContextType) {
   return user.role === null;
 }
 
-async function setRole(this: MethodsContextType, rbac: RBAC, roleName: RoleType) {
+async function setRole<A extends string, R extends string, RS extends string>(
+  this: MethodsContextType<A, R, RS>,
+  rbac: RBAC<R, A, RS>,
+  roleName: R,
+) {
   if (this.role === roleName) {
     throw new Error('User already has assigned this role');
   }
@@ -127,7 +150,10 @@ async function setRole(this: MethodsContextType, rbac: RBAC, roleName: RoleType)
   return user.role === this.role;
 }
 
-async function getScope(this: MethodsContextType, rbac: RBAC) {
+async function getScope<A extends string, R extends string, RS extends string>(
+  this: MethodsContextType<A, R, RS>,
+  rbac: RBAC<R, A, RS>,
+) {
   const permissions = this.permissions || [];
 
   const scope = await rbac.getScope(this.role);
@@ -135,7 +161,10 @@ async function getScope(this: MethodsContextType, rbac: RBAC) {
   return union(permissions, scope);
 }
 
-async function removeRoleFromCollection(this: MethodsContextType, roleName: RoleType) {
+async function removeRoleFromCollection<A extends string, R extends string, RS extends string>(
+  this: MethodsContextType<A, R, RS>,
+  roleName: R,
+) {
   await this.update(
     {
       role: roleName,
@@ -151,7 +180,10 @@ async function removeRoleFromCollection(this: MethodsContextType, roleName: Role
   return true;
 }
 
-async function removePermissionFromCollection(this: MethodsContextType, permissionName: GrantType) {
+async function removePermissionFromCollection<A extends string, R extends string, RS extends string>(
+  this: MethodsContextType<A, R, RS>,
+  permissionName?: GrantType<A, RS>,
+) {
   await this.update(
     {
       permissions: permissionName,
@@ -169,7 +201,10 @@ async function removePermissionFromCollection(this: MethodsContextType, permissi
   return true;
 }
 
-export default function hRBACPlugin(schema: Schema<ShapeSchema>, options: OptionPluginType = {}) {
+export default function hRBACPlugin<A extends string, R extends string, RS extends string>(
+  schema: Schema<ShapeSchema<A, R, RS>>,
+  options: OptionPluginType<A, R, RS> = {},
+) {
   schema.add({
     role: {
       type: String,

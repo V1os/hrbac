@@ -1,14 +1,19 @@
+import { DecodeNamePermissionType, DelimiterType, GrantType } from 'hrbac';
+
 import Base from './base';
 import { GRAND_DELIMITER } from './config/default';
 import { RBAC } from './rbac';
-import { ActionType, DecodeNamePermissionType, DelimiterType, GrantType, ResourceType } from './types';
 
-export class Permission extends Base {
-  #action: DecodeNamePermissionType['action'];
-  #resource: DecodeNamePermissionType['resource'];
+export class Permission<R extends string, A extends string, RS extends string> extends Base<R, A, RS> {
+  #action: A;
+  #resource: RS;
 
   /** Compute name of permission from action and resource */
-  static createName(action: ActionType, resource: ResourceType, delimiter: DelimiterType = GRAND_DELIMITER): GrantType {
+  static createName<A extends string, RS extends string>(
+    action: A,
+    resource: RS,
+    delimiter: DelimiterType = GRAND_DELIMITER,
+  ): GrantType<A, RS> {
     if (!delimiter) {
       throw new Error('Delimiter is not defined');
     }
@@ -21,10 +26,13 @@ export class Permission extends Base {
       throw new Error('Resource is not defined');
     }
 
-    return `${action}${delimiter}${resource}`;
+    return `${action}${delimiter}${resource}` as GrantType<A, RS>;
   }
 
-  static decodeName(name: GrantType, delimiter: DelimiterType = GRAND_DELIMITER): DecodeNamePermissionType {
+  static decodeName<A extends string, RS extends string>(
+    name: GrantType<A, RS>,
+    delimiter: DelimiterType = GRAND_DELIMITER,
+  ): DecodeNamePermissionType<A, RS> {
     if (!delimiter) {
       throw new Error('delimiter is required');
     }
@@ -39,13 +47,13 @@ export class Permission extends Base {
     }
 
     return {
-      action: name.slice(0, pos) as ActionType,
-      resource: name.slice(pos + 1) as ResourceType,
+      action: name.slice(0, pos) as A,
+      resource: name.slice(pos + 1) as RS,
     };
   }
 
   /**  Permission constructor  */
-  constructor(rbac: RBAC, action: ActionType, resource: ResourceType) {
+  constructor(rbac: RBAC<R, A, RS>, action: A, resource: RS) {
     if (!action || !resource) {
       throw new Error('One of parameters is undefined');
     }
@@ -64,9 +72,9 @@ export class Permission extends Base {
   }
 
   /** Get action name of actual permission */
-  get action(): ActionType {
+  get action(): A {
     if (!this.#action) {
-      const decoded = Permission.decodeName(this.name as GrantType, this.rbac.options.delimiter);
+      const decoded = Permission.decodeName<A, RS>(this.name as GrantType<A, RS>, this.rbac.options.delimiter);
       if (!decoded) {
         throw new Error('Action is null');
       }
@@ -78,9 +86,9 @@ export class Permission extends Base {
   }
 
   /** Get resource name of actual permission */
-  get resource(): ResourceType {
+  get resource(): RS {
     if (!this.#resource) {
-      const decoded = Permission.decodeName(this.name as GrantType, this.rbac.options.delimiter);
+      const decoded = Permission.decodeName<A, RS>(this.name as GrantType<A, RS>, this.rbac.options.delimiter);
       if (!decoded) {
         throw new Error('Resource is null');
       }
@@ -92,7 +100,7 @@ export class Permission extends Base {
   }
 
   /** Return true if it has same action and resource */
-  can(action: ActionType, resource: ResourceType): boolean {
+  can(action: A, resource: RS): boolean {
     return this.action === action && this.resource === resource;
   }
 

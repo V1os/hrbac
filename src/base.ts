@@ -1,11 +1,12 @@
+import { GrantType } from 'hrbac';
+
 import type { RBAC } from './rbac';
-import { GrantType, RoleType } from './types';
 
-export default class Base {
-  public name: RoleType | GrantType;
-  public rbac: RBAC;
+export default class Base<R extends string, A extends string, RS extends string> {
+  public name: R | GrantType<A, RS>;
+  public rbac: RBAC<R, A, RS>;
 
-  constructor(rbac: RBAC, name: RoleType | GrantType) {
+  constructor(rbac: RBAC<R, A, RS>, name: R | GrantType<A, RS>) {
     if (!rbac || !name) {
       throw new Error('One of parameters is undefined');
     }
