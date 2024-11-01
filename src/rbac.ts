@@ -1,3 +1,12 @@
+import {
+  RBACOptionsType,
+  PermissionParam,
+  GrantType,
+  TraverseGrantsParams,
+  RBACType,
+  GrantsType,
+  PermissionType,
+} from 'hrbac';
 import isPlainObject from 'lodash/isPlainObject';
 
 import Base from './base';
@@ -6,27 +15,13 @@ import { Permission } from './permission';
 import { Role } from './role';
 import Storage from './storages';
 import { MemoryStorage } from './storages/memory.storage';
-import {
-  ActionType,
-  GrantsType,
-  GrantType,
-  PermissionParam,
-  PermissionType,
-  RBACOptionsType,
-  RBACType,
-  ResourceType,
-  RoleType,
-  TraverseGrantsParams,
-} from './types';
-import logger from './util/logger';
+import logger from './utils/logger';
 
 logger.mute(false);
 
-const forbiddenError = new Error('Forbidden');
-
-export class RBAC {
-  public options: RBACOptionsType;
-  private storage: Storage;
+export class RBAC<R extends string, A extends string, RS extends string> {
+  public options: RBACOptionsType<R, A, RS>;
+  private storage: Storage<R, A, RS>;
 
   #upRule = false;
 
@@ -35,7 +30,10 @@ export class RBAC {
   static Storage: typeof Storage;
 
   /** Convert Array of permissions to permission name */
-  static getPermissionNames(permissions: PermissionParam[], delimiter: string = GRAND_DELIMITER): string[] {
+  static getPermissionNames<A extends string, R extends string>(
+    permissions: PermissionParam<A, R>[],
+    delimiter: string = GRAND_DELIMITER,
+  ): string[] {
     if (!delimiter) {
       throw new Error('Delimiter is not defined');
     }
@@ -43,13 +41,13 @@ export class RBAC {
     return permissions.map(([action, resource]) => Permission.createName(action, resource, delimiter));
   }
 
-  constructor(options?: Partial<RBACOptionsType>) {
+  constructor(options?: Partial<RBACOptionsType<R, A, RS>>) {
     this.options = {
       ...RBAC_DEFAULT_OPTIONS,
       ...options,
     };
 
-    this.storage = <Storage>this.options.storage || new MemoryStorage();
+    this.storage = <Storage<R, A, RS>>this.options.storage || new MemoryStorage<R, A, RS>();
     this.storage.useRBAC(this);
   }
 
@@ -61,49 +59,53 @@ export class RBAC {
     return this.#upRule;
   }
 
-  async init() {
+  async init(force: boolean = true) {
     const { roles, permissions, grants } = this.options;
-    this.upRule = true;
-    const result = await this.create(roles, permissions, grants);
+    this.upRule = force;
+    const result = await this.create(roles, permissions, grants, force);
     this.upRule = false;
 
     return result;
   }
 
   /** Get instance of Role or Permission by his name */
-  get(name: RoleType | GrantType): Promise<Base | undefined> {
+  get(name: R | GrantType<A, RS>, forceRole = false): Promise<Base<R, A, RS> | undefined> {
+    if (forceRole) {
+      return this.createRole(name as R, false);
+    }
+
     return this.storage.get(name);
   }
 
   /**  Return instance of Role by his name */
-  getRole(name: RoleType): Promise<Role | undefined> {
+  getRole(name: R): Promise<Role<R, A, RS> | undefined> {
     return this.storage.getRole(name);
   }
 
   /** Return all instances of Role */
-  getRoles(): Promise<Role[]> {
+  getRoles(): Promise<Role<R, A, RS>[]> {
     return this.storage.getRoles();
   }
 
   /** Return instance of Permission by his action and resource */
-  getPermission(action: ActionType, resource: ResourceType): Promise<Permission | undefined> {
+  getPermission(action: A, resource: RS): Promise<Permission<R, A, RS> | undefined> {
     return this.storage.getPermission(action, resource);
   }
 
   /** Return instance of Permission by his name */
-  getPermissionByName(name: GrantType): Promise<Permission | undefined> {
+  getPermissionByName(name: GrantType<A, RS>): Promise<Permission<R, A, RS> | undefined> {
     const data = Permission.decodeName(name, this.options.delimiter);
-    return this.storage.getPermission(data.action, data.resource);
+    return this.storage.getPermission(data.action as A, data.resource as RS);
   }
 
   /** Return all instances of Permission */
-  getPermissions(): Promise<Permission[]> {
+  getPermissions(): Promise<Permission<R, A, RS>[]> {
     return this.storage.getPermissions();
   }
 
   /** Return array of all permission assigned to role of RBAC */
-  async getScope(roleName: RoleType): Promise<Base['name'][]> {
-    const scope: Base['name'][] = [];
+  async getScope(roleName: R): Promise<Base<R, A, RS>['name'][]> {
+    const scope: Base<R, A, RS>['name'][] = [];
 
     // traverse hierarchy
     await this.traverseGrants({
@@ -121,7 +123,7 @@ export class RBAC {
   }
 
   /** Register role or permission to actual RBAC instance */
-  add(item: Base): Promise<boolean> {
+  add(item: Base<R, A, RS>): Promise<boolean> {
     if (!item) {
       throw new Error('Item is undefined');
     }
@@ -131,14 +133,21 @@ export class RBAC {
     }
 
     if (item.name === Role.sudoName && !this.upRule) {
-      throw forbiddenError;
+      throw new Error(`Forbidden add item '${item.name}'`);
     }
 
     return this.storage.add(item);
   }
 
   /** Create multiple permissions and roles in one step */
-  async create(roleNames: RoleType[], permissionNames: PermissionType, grantsData?: GrantsType): Promise<RBACType> {
+  async create(
+    roleNames: R[],
+    permissionNames: PermissionType<RS, A>,
+    grantsData?: GrantsType<R, A, RS>,
+    force: boolean = false,
+  ): Promise<RBACType> {
+    this.upRule = force;
+
     const [permissions, roles] = await Promise.all([
       this.createPermissions(permissionNames),
       this.createRoles(roleNames),
@@ -148,6 +157,8 @@ export class RBAC {
       await this.grants(grantsData);
     }
 
+    this.upRule = false;
+
     return {
       permissions,
       roles,
@@ -155,7 +166,7 @@ export class RBAC {
   }
 
   /** Create a new role assigned to actual instance of RBAC */
-  async createRole(roleName: RoleType, add = true): Promise<Role> {
+  async createRole(roleName: R, add = true): Promise<Role<R, A, RS>> {
     const role = new Role(this, roleName);
     if (add) {
       await role.add();
@@ -165,8 +176,8 @@ export class RBAC {
   }
 
   /** Create multiple roles in one step assigned to actual instance of RBAC */
-  async createRoles(roleNames: RoleType[], add = true): Promise<Record<string, Role>> {
-    const roles: Record<string, Role> = {};
+  async createRoles(roleNames: R[], add = true): Promise<Record<string, Role<R, A, RS>>> {
+    const roles: Record<string, Role<R, A, RS>> = {};
     await Promise.all(
       roleNames.map(async roleName => {
         const role = await this.createRole(roleName, add);
@@ -179,7 +190,7 @@ export class RBAC {
   }
 
   /** Create a new permission assigned to actual instance of RBAC */
-  async createPermission(action: ActionType, resource: ResourceType, add = true): Promise<Permission> {
+  async createPermission(action: A, resource: RS, add = true): Promise<Permission<R, A, RS>> {
     const permission = new Permission(this, action, resource);
     if (add) {
       await permission.add();
@@ -189,16 +200,16 @@ export class RBAC {
   }
 
   /** Create multiple permissions in one step */
-  async createPermissions(resources: PermissionType, add = true): Promise<Record<string, Permission>> {
+  async createPermissions(resources: PermissionType<RS, A>, add = true): Promise<Record<string, Permission<R, A, RS>>> {
     if (!isPlainObject(resources)) {
       throw new Error('Resources is not a plain object');
     }
 
-    const permissions: Record<string, Permission> = {};
+    const permissions: Record<string, Permission<R, A, RS>> = {};
 
-    for (const [resource, actions] of Object.entries(resources)) {
+    for (const [resource, actions] of Object.entries(resources) as [RS, A[]][]) {
       for (const action of actions) {
-        const permission = await this.createPermission(action, resource as ResourceType, add);
+        const permission = await this.createPermission(action, resource as RS, add);
         permissions[permission.name] = permission;
       }
     }
@@ -207,48 +218,52 @@ export class RBAC {
   }
 
   /** Grant permission or role to the role */
-  grant(role: Role, child: Base): Promise<boolean> {
+  grant(role: Role<R, A, RS>, child: Base<R, A, RS>): Promise<boolean> {
     if (role.rbac !== this || child.rbac !== this) {
       throw new Error('Item is associated to another RBAC instance');
     }
 
     if (child.name === Role.sudoName && !this.upRule) {
-      throw forbiddenError;
+      throw new Error(`Forbidden grant rule '${child.name}'`);
     }
 
     return this.storage.grant(role, child);
   }
 
   /** Grant permission or role from the role by names */
-  async grantByName(roleName: RoleType, childName: RoleType | GrantType): Promise<boolean> {
-    const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
+  async grantByName(roleName: R, childName: R | GrantType<A, RS>): Promise<boolean> {
+    const [role, child] = await Promise.all([
+      this.get(roleName, roleName === Role.sudoName && !this.upRule),
+      this.get(childName),
+    ]);
 
     this.checkItems(role?.name, child?.name);
 
-    return await this.grant(role as Role, child as Base);
+    return await this.grant(role as Role<R, A, RS>, child as Base<R, A, RS>);
   }
 
   /** Grant multiple items in one function */
-  async grants(data: GrantsType): Promise<Partial<Record<RoleType, boolean[]>>> {
+  async grants(data: GrantsType<R, A, RS>): Promise<Partial<Record<R, unknown[][]>>> {
     if (!isPlainObject(data)) {
       throw new Error('Grants is not a plain object');
     }
-    const results: Partial<Record<RoleType, boolean[]>> = {};
+    const results: Partial<Record<R, unknown[][]>> = {};
 
-    for (const [roleName, grants] of Object.entries(data)) {
+    for (const [roleName, grants] of Object.entries(data) as [R, (GrantType<A, RS> | R)[]][]) {
       const write = [];
       for (const grant of grants) {
-        write.push(await this.grantByName(roleName as RoleType, grant));
+        const isGrant = await this.grantByName(roleName as R, grant);
+        write.push([grant, isGrant]);
       }
 
-      results[roleName as RoleType] = write;
+      results[roleName as R] = write;
     }
 
     return results;
   }
 
   /** Remove role or permission from RBAC */
-  remove(item: Base): Promise<boolean> {
+  remove(item: Base<R, A, RS>): Promise<boolean> {
     if (!item) {
       throw new Error('Item is undefined');
     }
@@ -258,14 +273,14 @@ export class RBAC {
     }
 
     if (item.name === Role.sudoName && !this.upRule) {
-      throw forbiddenError;
+      throw new Error(`Forbidden remove item '${item.name}'`);
     }
 
     return this.storage.remove(item);
   }
 
   /** Remove role or permission from RBAC */
-  async removeByName(name: RoleType | GrantType): Promise<boolean> {
+  async removeByName(name: R | GrantType<A, RS>): Promise<boolean> {
     const item = await this.get(name);
     if (!item) {
       return true;
@@ -275,7 +290,7 @@ export class RBAC {
   }
 
   /** Revoke permission or role from the role */
-  revoke(role: Role, child: Base): Promise<boolean> {
+  revoke(role: Role<R, A, RS>, child: Base<R, A, RS>): Promise<boolean> {
     this.checkItems(role?.name, child?.name);
 
     if (role.rbac !== this || child.rbac !== this) {
@@ -283,19 +298,19 @@ export class RBAC {
     }
 
     if (role.name === Role.sudoName && !this.upRule) {
-      throw forbiddenError;
+      throw new Error(`Forbidden revoke item '${role.name}'`);
     }
 
     return this.storage.revoke(role, child);
   }
 
   /** Revoke permission or role from the role by names */
-  async revokeByName(roleName: RoleType, childName: RoleType | GrantType): Promise<boolean> {
+  async revokeByName(roleName: R, childName: R | GrantType<A, RS>): Promise<boolean> {
     const [role, child] = await Promise.all([this.get(roleName), this.get(childName)]);
 
     this.checkItems(role?.name, child?.name);
 
-    return this.revoke(role as Role, child as Base);
+    return this.revoke(role as Role<R, A, RS>, child as Base<R, A, RS>);
   }
 
   async deleteAll(): Promise<RBACType> {
@@ -316,7 +331,7 @@ export class RBAC {
   }
 
   /** Return true if role has allowed permission */
-  async can(roleName: RoleType, action: ActionType, resource: ResourceType): Promise<boolean> {
+  async can(roleName: R, action: A, resource: RS): Promise<boolean> {
     const can = await this.traverseGrants({
       roleName: roleName,
       handle: async item => {
@@ -332,7 +347,7 @@ export class RBAC {
   }
 
   /** Check if the role has any of the given permissions. */
-  async canAny(roleName: RoleType, permissions: PermissionParam[]): Promise<boolean> {
+  async canAny(roleName: R, permissions: PermissionParam<A, RS>[]): Promise<boolean> {
     // prepare the names of permissions
     const permissionNames = RBAC.getPermissionNames(permissions, this.options?.delimiter);
 
@@ -352,18 +367,18 @@ export class RBAC {
   }
 
   /** Check if the model has all the given permissions. */
-  async canAll(roleName: RoleType, permissions: PermissionParam[]): Promise<boolean> {
+  async canAll(roleName: R, permissions: PermissionParam<A, RS>[]): Promise<boolean> {
     // prepare the names of permissions
     const permissionNames = RBAC.getPermissionNames(permissions, this.options.delimiter);
-    const founded: Partial<Record<RoleType, boolean>> = {};
+    const founded: Partial<Record<R, boolean>> = {};
     let foundedCount = 0;
 
     // traverse hierarchy
     await this.traverseGrants({
       roleName: roleName,
       handle: async item => {
-        if (item instanceof Permission && permissionNames.includes(item.name) && !founded[item.name as RoleType]) {
-          founded[item.name as RoleType] = true;
+        if (item instanceof Permission && permissionNames.includes(item.name) && !founded[item.name as R]) {
+          founded[item.name as R] = true;
           foundedCount += 1;
 
           if (foundedCount === permissionNames.length) {
@@ -379,22 +394,22 @@ export class RBAC {
   }
 
   /** Callback returns true if role or permission exists */
-  exists(name: RoleType | GrantType): Promise<boolean> {
+  exists(name: R | GrantType<A, RS>): Promise<boolean> {
     return this.storage.exists(name);
   }
 
   /** Callback returns true if role exists */
-  existsRole(name: RoleType): Promise<boolean> {
+  existsRole(name: R): Promise<boolean> {
     return this.storage.existsRole(name);
   }
 
   /** Callback returns true if permission exists */
-  existsPermission(action: ActionType, resource: ResourceType): Promise<boolean> {
+  existsPermission(action: A, resource: RS): Promise<boolean> {
     return this.storage.existsPermission(action, resource);
   }
 
   /** Return true if role has allowed permission */
-  async hasRole(roleName: RoleType, roleChildName: RoleType): Promise<boolean> {
+  async hasRole(roleName: R, roleChildName: R): Promise<boolean> {
     if (roleName === roleChildName) {
       return true;
     }
@@ -422,7 +437,7 @@ export class RBAC {
     handle,
     next = [roleName],
     used = {},
-  }: TraverseGrantsParams): Promise<boolean | undefined> {
+  }: TraverseGrantsParams<R>): Promise<boolean | undefined> {
     const actualRole = next.shift();
     actualRole && (used[actualRole] = true);
 
@@ -431,9 +446,9 @@ export class RBAC {
       const item = grants[i];
       const { name } = item;
 
-      if (item instanceof Role && !used[name as RoleType]) {
-        used[name as RoleType] = true;
-        next.push(name as RoleType);
+      if (item instanceof Role && !used[name as R]) {
+        used[name as R] = true;
+        next.push(name as R);
       }
 
       const result = await handle(item);

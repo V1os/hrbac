@@ -1,13 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Node 16",
+  "display": "Node 20",
   "compilerOptions": {
     "lib": [
       "ES2020", "ES2021", "ESNext"
     ],
-    "module": "commonjs",
+    "module": "ESNext",
     "target": "ES2021",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "customConditions": ["module"],
     "strict": true,
     "sourceMap": true,
     "esModuleInterop": true,
@@ -21,6 +22,21 @@
     "outDir": "dist",
     "rootDir": "./",
     "baseUrl": ".",
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "allowArbitraryExtensions": true,
+//    "verbatimModuleSyntax": true
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/bun-types",
+      "./src/declarations"
+    ],
+    "types": [
+      "hrbac",
+      "jest",
+      "lodash",
+      "node"
+    ]
   },
   "include": [
     "src/**/*.ts",

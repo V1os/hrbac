@@ -1,10 +1,11 @@
+import { RecordType } from 'hrbac';
 import Redis from 'ioredis';
 
 import Base from '../base';
+import { TypeEnum } from '../enums';
 import { Permission } from '../permission';
 import { Role } from '../role';
-import { RecordType, RoleType, TypeEnum } from '../types';
-import aclLogger from '../util/logger';
+import aclLogger from '../utils/logger';
 import Storage from './index';
 
 aclLogger.mute(false);
@@ -14,7 +15,7 @@ const KEY_PERMISSION = 'RBACPermission:';
 const getRoleKey = (roleName: string) => `${KEY_ROLE}${roleName}`;
 const getPermissionKey = (permission: string) => `${KEY_PERMISSION}${permission}`;
 
-export class RedisStorage extends Storage {
+export class RedisStorage<R extends string, A extends string, RS extends string> extends Storage<R, A, RS> {
   #client: Redis;
   constructor() {
     super();
@@ -29,13 +30,13 @@ export class RedisStorage extends Storage {
     });
   }
 
-  async add(item: Base): Promise<boolean> {
+  async add(item: Base<R, A, RS>): Promise<boolean> {
     await this.addToSet(item);
 
     return true;
   }
 
-  async remove(item: Base): Promise<boolean> {
+  async remove(item: Base<R, A, RS>): Promise<boolean> {
     const { name } = item;
     const items = await this.getItemsValue(TypeEnum.ROLE);
 
@@ -54,7 +55,7 @@ export class RedisStorage extends Storage {
     return true;
   }
 
-  async grant(role: Role, child: Base): Promise<boolean> {
+  async grant(role: Role<R, A, RS>, child: Base<R, A, RS>): Promise<boolean> {
     const { name } = role;
     const { name: childName } = child;
 
@@ -79,7 +80,7 @@ export class RedisStorage extends Storage {
     return true;
   }
 
-  async revoke(role: Role, child: Base): Promise<boolean> {
+  async revoke(role: Role<R, A, RS>, child: Base<R, A, RS>): Promise<boolean> {
     const { name } = role;
     const { name: childName } = child;
 
@@ -100,7 +101,7 @@ export class RedisStorage extends Storage {
     return true;
   }
 
-  async get(name: string): Promise<Base | undefined> {
+  async get(name: string): Promise<Base<R, A, RS> | undefined> {
     try {
       const item = await this.getItemByKey(getRoleKey(name));
 
@@ -120,9 +121,9 @@ export class RedisStorage extends Storage {
     return undefined;
   }
 
-  async getRoles(): Promise<Role[]> {
+  async getRoles(): Promise<Role<R, A, RS>[]> {
     const items = await this.getItemsValue(TypeEnum.ROLE);
-    const roles: Role[] = [];
+    const roles: Role<R, A, RS>[] = [];
 
     if (items.length === 0) {
       return roles;
@@ -130,15 +131,15 @@ export class RedisStorage extends Storage {
 
     for await (const item of items) {
       const role = await this.convertToInstance(item);
-      roles.push(role as Role);
+      roles.push(role as Role<R, A, RS>);
     }
 
     return roles;
   }
 
-  async getPermissions(): Promise<Permission[]> {
+  async getPermissions(): Promise<Permission<R, A, RS>[]> {
     const items = await this.getItemsValue(TypeEnum.PERMISSION);
-    const permissions: Permission[] = [];
+    const permissions: Permission<R, A, RS>[] = [];
 
     if (items.length === 0) {
       return permissions;
@@ -146,14 +147,14 @@ export class RedisStorage extends Storage {
 
     for await (const item of items) {
       const permission = await this.convertToInstance(item);
-      permissions.push(permission as Permission);
+      permissions.push(permission as Permission<R, A, RS>);
     }
 
     return permissions;
   }
 
-  async getGrants(roleName: RoleType): Promise<Base[]> {
-    const grants: Base[] = [];
+  async getGrants(roleName: R): Promise<Base<R, A, RS>[]> {
+    const grants: Base<R, A, RS>[] = [];
 
     try {
       const itemRole = await this.getItemByKey(getRoleKey(roleName));
@@ -187,7 +188,7 @@ export class RedisStorage extends Storage {
     return grants;
   }
 
-  private async addToSet(item: Base) {
+  private async addToSet(item: Base<R, A, RS>) {
     const type = this.getType(item);
 
     if (!type) {
@@ -202,9 +203,9 @@ export class RedisStorage extends Storage {
       } else {
         const value = {
           type: type as TypeEnum,
-          name: item.name as RoleType,
+          name: item.name as R,
           grants: [],
-        } as RecordType;
+        } as RecordType<R, A, RS>;
 
         await this.setItemValue(getRoleKey(item.name), value);
       }
@@ -218,8 +219,8 @@ export class RedisStorage extends Storage {
       } else {
         const value = {
           type: type as TypeEnum,
-          name: item.name as RoleType,
-        } as RecordType;
+          name: item.name as R,
+        } as RecordType<R, A, RS>;
 
         await this.setItemValue(getPermissionKey(item.name), value);
       }
@@ -228,11 +229,11 @@ export class RedisStorage extends Storage {
     }
   }
 
-  private async setItemValue(key: string, value: RecordType) {
+  private async setItemValue(key: string, value: RecordType<R, A, RS>) {
     return this.#client.set(key, JSON.stringify(value));
   }
 
-  private async getItemValue(item: Base, overwrite?: string) {
+  private async getItemValue(item: Base<R, A, RS>, overwrite?: string) {
     const type = this.getType(item);
     const key = type === TypeEnum.PERMISSION ? getPermissionKey(item.name) : getRoleKey(item.name);
 
@@ -242,7 +243,7 @@ export class RedisStorage extends Storage {
   private async getItemByKey(key: string) {
     const value = await this.#client.get(key);
     if (value) {
-      return JSON.parse(value) as RecordType;
+      return JSON.parse(value) as RecordType<R, A, RS>;
     }
 
     throw new Error(`Empty value of key '${key}'`);
@@ -273,7 +274,7 @@ export class RedisStorage extends Storage {
 
   private async getItemsValue(type: TypeEnum) {
     const keys = await this.#client.keys(`${type === TypeEnum.PERMISSION ? KEY_PERMISSION : KEY_ROLE}*`);
-    const results: RecordType[] = [];
+    const results: RecordType<R, A, RS>[] = [];
 
     for await (const key of keys) {
       const item = await this.getItemByKey(key);

@@ -1,18 +1,22 @@
+import { GrantType } from 'hrbac';
+
 import Base from '../base';
 import { Permission } from '../permission';
 import { Role } from '../role';
-import { GrantType, RoleType } from '../types';
-import aclLogger from '../util/logger';
+import aclLogger from '../utils/logger';
 import Storage from './index';
 
-type ItemType = { instance: Base; grants: (GrantType | RoleType)[] };
+type ItemType<R extends string, A extends string, RS extends string> = {
+  instance: Base<R, A, RS>;
+  grants: (GrantType<A, RS> | R)[];
+};
 
 aclLogger.mute(false);
 
-export class MemoryStorage extends Storage {
-  items: Record<string, ItemType> = {};
+export class MemoryStorage<R extends string, A extends string, RS extends string> extends Storage<R, A, RS> {
+  items: Record<string, ItemType<R, A, RS>> = {};
 
-  async add(item: Base): Promise<boolean> {
+  async add(item: Base<R, A, RS>): Promise<boolean> {
     const { name } = item;
     if (this.items[name]) {
       throw new Error(`Item ${name} already exists`);
@@ -28,7 +32,7 @@ export class MemoryStorage extends Storage {
     return true;
   }
 
-  async remove(item: Base): Promise<boolean> {
+  async remove(item: Base<R, A, RS>): Promise<boolean> {
     const { items } = this;
     const { name } = item;
     if (!items[name]) {
@@ -49,7 +53,7 @@ export class MemoryStorage extends Storage {
     return true;
   }
 
-  async grant(role: Role, child: Base): Promise<boolean> {
+  async grant(role: Role<R, A, RS>, child: Base<R, A, RS>): Promise<boolean> {
     const { name } = role;
     const { name: childName } = child;
 
@@ -75,7 +79,7 @@ export class MemoryStorage extends Storage {
     return true;
   }
 
-  async revoke(role: Role, child: Base): Promise<boolean> {
+  async revoke(role: Role<R, A, RS>, child: Base<R, A, RS>): Promise<boolean> {
     const { name } = role;
     const { name: childName } = child;
 
@@ -95,7 +99,7 @@ export class MemoryStorage extends Storage {
     return true;
   }
 
-  async get(name: string): Promise<Base | undefined> {
+  async get(name: string): Promise<Base<R, A, RS> | undefined> {
     if (name && this.items[name]) {
       return this.items[name].instance;
     }
@@ -103,8 +107,8 @@ export class MemoryStorage extends Storage {
     return undefined;
   }
 
-  async getRoles(): Promise<Role[]> {
-    return Object.values(this.items).reduce((filtered: Role[], item: ItemType) => {
+  async getRoles(): Promise<Role<R, A, RS>[]> {
+    return Object.values(this.items).reduce((filtered: Role<R, A, RS>[], item: ItemType<R, A, RS>) => {
       const { instance } = item;
 
       if (instance instanceof Role) {
@@ -115,8 +119,8 @@ export class MemoryStorage extends Storage {
     }, []);
   }
 
-  async getPermissions(): Promise<Permission[]> {
-    return Object.values(this.items).reduce((filtered: Permission[], item: ItemType) => {
+  async getPermissions(): Promise<Permission<R, A, RS>[]> {
+    return Object.values(this.items).reduce((filtered: Permission<R, A, RS>[], item: ItemType<R, A, RS>) => {
       const { instance } = item;
 
       if (instance instanceof Permission) {
@@ -127,11 +131,11 @@ export class MemoryStorage extends Storage {
     }, []);
   }
 
-  async getGrants(role: string): Promise<Base[]> {
+  async getGrants(role: string): Promise<Base<R, A, RS>[]> {
     if (role && this.items[role]) {
       const currentGrants = this.items[role].grants;
 
-      return currentGrants.reduce((filtered: Base[], grantName: string) => {
+      return currentGrants.reduce((filtered: Base<R, A, RS>[], grantName: string) => {
         const grant = this.items[grantName];
         if (grant) {
           filtered.push(grant.instance);
